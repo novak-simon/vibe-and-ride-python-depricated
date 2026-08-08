@@ -93,9 +93,14 @@ class MusicPlayer:
         )
 
     def _set_current_source(self) -> None:
-        if self._player is None or self._current_index < 0 or self._current_index >= len(self._songs):
+        if (
+            self._player is None
+            or self._current_index < 0
+            or self._current_index >= len(self._songs)
+        ):
             logger.warning("No current song to set")
             return
+
         source = QUrl.fromLocalFile(str(self._songs[self._current_index]))
         logger.info("Setting music source: %s", source.toString())
         self._player.setSource(source)

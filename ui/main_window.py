@@ -1,10 +1,11 @@
 from __future__ import annotations
 import logging
+import json
 
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QTimer, Qt, QUrl
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
