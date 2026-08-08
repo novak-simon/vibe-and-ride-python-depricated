@@ -4,9 +4,12 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 
+QMediaPlaylist = None
+
 try:
     from PySide6.QtCore import QUrl
-    from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+    from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer, QMediaPlaylist as _QMediaPlaylist
+    QMediaPlaylist = _QMediaPlaylist
     _PYSIDE6_MULTIMEDIA_ERROR = None
 except ImportError as exc:
     QUrl = QAudioOutput = QMediaPlayer = None
@@ -20,14 +23,15 @@ class MusicPlayer:
     def __init__(self, songs_dir: Path):
         self._player = None
         self._audio_output = None
+        self._playlist = None
         self._songs: List[Path] = []
         self._current_index = -1
         self._backend_error = _PYSIDE6_MULTIMEDIA_ERROR
         self._backend_available = (
-            self._backend_error is None
-            and QMediaPlayer is not None
+            QMediaPlayer is not None
             and QAudioOutput is not None
             and QUrl is not None
+            and QMediaPlaylist is not None
         )
         self._end_of_media_status = None
 
@@ -40,9 +44,15 @@ class MusicPlayer:
 
         self._player = QMediaPlayer()
         self._audio_output = QAudioOutput()
-        self._audio_output.setVolume(1.0)
-        self._audio_output.setMuted(False)
+        if hasattr(self._audio_output, "setVolume"):
+            self._audio_output.setVolume(1.0)
+        if hasattr(self._audio_output, "setMuted"):
+            self._audio_output.setMuted(False)
         self._player.setAudioOutput(self._audio_output)
+
+        self._playlist = QMediaPlaylist()
+        if hasattr(self._player, "setPlaylist"):
+            self._player.setPlaylist(self._playlist)
 
         self._load_songs(songs_dir)
 
@@ -72,6 +82,8 @@ class MusicPlayer:
         for path in sorted(songs_dir.iterdir()):
             if path.suffix.lower() in AUDIO_EXTENSIONS:
                 self._songs.append(path)
+                if self._playlist is not None and hasattr(self._playlist, "addMedia"):
+                    self._playlist.addMedia(QUrl.fromLocalFile(str(path)))
 
         logger.info("Loaded %d songs from %s", len(self._songs), songs_dir)
 
@@ -85,11 +97,14 @@ class MusicPlayer:
 
     @property
     def debug_info(self) -> str:
-        if self._backend_error is not None:
-            return f"backend unavailable: {self._backend_error!r}"
+        if not self._backend_available:
+            return "backend unavailable"
+        media_count = 0
+        if self._playlist is not None and hasattr(self._playlist, "mediaCount"):
+            media_count = self._playlist.mediaCount()
         return (
-            f"backend OK, songs={len(self._songs)}, current_index={self._current_index}, "
-            f"current_song={self.current_song_name() or 'none'}"
+            f"backend OK, songs={len(self._songs)}, media_count={media_count}, "
+            f"current_index={self._current_index}"
         )
 
     def _set_current_source(self) -> None:
@@ -102,8 +117,10 @@ class MusicPlayer:
             return
 
         source = QUrl.fromLocalFile(str(self._songs[self._current_index]))
-        logger.info("Setting music source: %s", source.toString())
-        self._player.setSource(source)
+        source_display = source.toString() if hasattr(source, "toString") else str(source)
+        logger.info("Setting music source: %s", source_display)
+        if hasattr(self._player, "setSource"):
+            self._player.setSource(source)
 
     def play(self) -> None:
         if not self.available or self._player is None:
