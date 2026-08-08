@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Optional
 
@@ -22,6 +21,7 @@ from workout.parser import parse_zwo_file
 from workout.scheduler import WorkoutScheduler, WorkoutStatus
 
 from .formatting import format_seconds
+from .music_player import MusicPlayer
 
 
 def _optional_float(value: Optional[float]) -> Optional[float]:
@@ -35,11 +35,15 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Zwift Music")
         self.scheduler: Optional[WorkoutScheduler] = None
+        self._music_player = MusicPlayer(self._sample_song_dir())
         self._build_ui()
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._refresh_state)
         self._timer.start(200)
+
+    def _sample_song_dir(self) -> Path:
+        return Path(__file__).resolve().parents[1] / "assets" / "sample_songs"
 
     def _build_ui(self) -> None:
         central = QWidget(self)
@@ -59,6 +63,16 @@ class MainWindow(QMainWindow):
 
         self._interval_detail_label = QLabel("Current interval details will appear here.")
         self._interval_detail_label.setWordWrap(True)
+
+        self._song_label = QLabel(
+            f"Song: {self._music_player.current_song_name() or 'none'}"
+        )
+        self._song_label.setWordWrap(True)
+        self._music_status_label = QLabel(
+            f"Music: {'enabled' if self._music_player.available else 'disabled'}"
+        )
+        self._music_debug_label = QLabel(self._music_player.debug_info)
+        self._music_debug_label.setWordWrap(True)
         self._interval_time_label = QLabel("Interval time: 00:00 / 00:00")
         self._workout_time_label = QLabel("Workout time: 00:00 / 00:00")
         self._status_label = QLabel("Status: no workout loaded")
@@ -87,6 +101,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._interval_count_label)
         layout.addWidget(self._interval_label)
         layout.addWidget(self._interval_detail_label)
+        layout.addWidget(self._song_label)
+        layout.addWidget(self._music_status_label)
+        layout.addWidget(self._music_debug_label)
         layout.addWidget(self._interval_time_label)
         layout.addWidget(self._workout_time_label)
         layout.addLayout(button_layout)
@@ -292,6 +309,7 @@ class MainWindow(QMainWindow):
             return
 
         state = self.scheduler.get_state()
+
         if state.interval_index is None:
             self._interval_label.setText("Interval: finished")
             self._interval_detail_label.setText("Workout complete.")
@@ -300,6 +318,25 @@ class MainWindow(QMainWindow):
                 f"Interval {state.interval_index + 1} / {len(self.scheduler.workout.intervals)}"
             )
             self._interval_detail_label.setText(self._format_interval_description(state.current_interval))
+
+        if state.status == WorkoutStatus.RUNNING:
+            if state.interval_changed:
+                self._music_player.next_track()
+            self._music_player.play()
+        elif state.status == WorkoutStatus.PAUSED or state.status == WorkoutStatus.NOT_STARTED:
+            self._music_player.pause()
+        else:
+            self._music_player.stop()
+
+        self._song_label.setText(
+            f"Song: {self._music_player.current_song_name() or 'none'}"
+        )
+        self._music_status_label.setText(
+            f"Music: {'playing' if state.status == WorkoutStatus.RUNNING else 'paused'}"
+            if self._music_player.available
+            else "Music: disabled"
+        )
+        self._music_debug_label.setText(self._music_player.debug_info)
 
         self._interval_time_label.setText(
             f"Interval time: {format_seconds(state.elapsed_in_interval)} / {format_seconds(state.remaining_in_interval)}"
