@@ -6,12 +6,10 @@ from typing import Optional
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
-    QApplication,
     QFileDialog,
     QHBoxLayout,
     QLabel,
     QInputDialog,
-    QLineEdit,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -19,11 +17,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from workout.model import Workout
+from workout.model import Interval, Workout
 from workout.parser import parse_zwo_file
 from workout.scheduler import WorkoutScheduler, WorkoutStatus
 
 from .formatting import format_seconds
+
+
+def _optional_float(value: Optional[float]) -> Optional[float]:
+    if value is None:
+        return None
+    return float(value)
 
 
 class MainWindow(QMainWindow):
@@ -130,7 +134,90 @@ class MainWindow(QMainWindow):
         if not isinstance(parsed, dict):
             raise ValueError("Workout file does not contain valid workout data.")
 
-        return Workout.from_parsed(parsed)
+        try:
+            return Workout.from_parsed(parsed)
+        except ValueError:
+            return self._build_workout_from_parsed_node(parsed)
+
+    def _build_workout_from_parsed_node(self, parsed: dict) -> Workout:
+        if not isinstance(parsed, dict):
+            raise ValueError("Workout file does not contain valid workout data.")
+
+        intervals = self._extract_intervals_from_node(parsed)
+        if not intervals:
+            raise ValueError(
+                "Workout file does not contain interval data. "
+                f"Parsed keys: {list(parsed.keys())}"
+            )
+
+        return Workout(
+            name=parsed.get("name") or parsed.get("Name"),
+            author=parsed.get("author") or parsed.get("Author"),
+            sport_type=parsed.get("sport_type") or parsed.get("SportType"),
+            tags=list(parsed.get("tags", [])),
+            description=parsed.get("description") or parsed.get("Description"),
+            intervals=intervals,
+        )
+
+    def _extract_intervals_from_node(self, node: dict) -> list[Interval]:
+        if not isinstance(node, dict):
+            return []
+
+        if node.get("children"):
+            intervals = []
+            for child in node.get("children", []):
+                intervals.extend(self._extract_intervals_from_node(child))
+            return intervals
+
+        if node.get("type") == "IntervalsT":
+            return self._intervals_from_intervals_t(node.get("attrs", {}) or {})
+
+        interval_info = node.get("interval") or {}
+        duration = interval_info.get("duration")
+        if duration is None:
+            return []
+
+        return [
+            Interval(
+                duration=float(duration),
+                power=_optional_float(interval_info.get("power")),
+                cadence=_optional_float(interval_info.get("cadence")),
+                type=node.get("type"),
+                attrs=dict(node.get("attrs", {}) or {}),
+            )
+        ]
+
+    def _intervals_from_intervals_t(self, attrs: dict) -> list[Interval]:
+        repeat = int(attrs.get("Repeat") or 1)
+        on_duration = attrs.get("OnDuration")
+        off_duration = attrs.get("OffDuration")
+        on_power = _optional_float(attrs.get("OnPower"))
+        off_power = _optional_float(attrs.get("OffPower"))
+        cadence = _optional_float(attrs.get("Cadence"))
+
+        intervals = []
+        for _ in range(repeat):
+            if on_duration is not None:
+                intervals.append(
+                    Interval(
+                        duration=float(on_duration),
+                        power=on_power,
+                        cadence=cadence,
+                        type="IntervalsT",
+                        attrs=dict(attrs),
+                    )
+                )
+            if off_duration is not None:
+                intervals.append(
+                    Interval(
+                        duration=float(off_duration),
+                        power=off_power,
+                        cadence=cadence,
+                        type="IntervalsT",
+                        attrs=dict(attrs),
+                    )
+                )
+        return intervals
 
     def _start_workout(self) -> None:
         if self.scheduler is None:
@@ -230,7 +317,7 @@ class MainWindow(QMainWindow):
         if state.status == WorkoutStatus.FINISHED:
             self._timer.stop()
 
-    def _format_interval_description(self, interval: Optional[WorkoutInterval]) -> str:
+    def _format_interval_description(self, interval: Optional[Interval]) -> str:
         if interval is None:
             return "No current interval."
         parts = [f"Duration: {format_seconds(interval.duration)}"]

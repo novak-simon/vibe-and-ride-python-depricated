@@ -45,8 +45,25 @@ class Workout:
 
     @classmethod
     def from_parsed(cls, parsed: ZwoNode) -> "Workout":
+        if not isinstance(parsed, dict):
+            raise ValueError("Parsed workout data must be a dict")
+
+        if parsed.get("type") is None:
+            intervals = _intervals_from_list(parsed.get("intervals", [])) if isinstance(parsed.get("intervals"), list) else _extract_wod_intervals(parsed)
+            if not intervals:
+                raise ValueError("Parsed workout data contains no intervals")
+            return cls(
+                name=parsed.get("name"),
+                author=parsed.get("author"),
+                sport_type=parsed.get("sport_type") or parsed.get("sportType"),
+                tags=list(parsed.get("tags", [])),
+                description=parsed.get("description"),
+                intervals=intervals,
+            )
+
         if parsed.get("type") != "Workout":
             raise ValueError("Parsed data must represent a Workout node")
+
         return cls(
             name=parsed.get("name"),
             author=parsed.get("author"),
@@ -55,6 +72,26 @@ class Workout:
             description=parsed.get("description"),
             intervals=_extract_wod_intervals(parsed),
         )
+
+
+def _intervals_from_list(intervals_data: List[ZwoNode]) -> List[Interval]:
+    output: List[Interval] = []
+    for item in intervals_data:
+        if not isinstance(item, dict):
+            continue
+        duration = item.get("duration")
+        if duration is None:
+            continue
+        output.append(
+            Interval(
+                duration=float(duration),
+                power=_optional_float(item.get("power")),
+                cadence=_optional_float(item.get("cadence")),
+                type=item.get("type"),
+                attrs=dict(item.get("attrs", {})),
+            )
+        )
+    return output
 
 
 def _optional_float(value: Any) -> Optional[float]:
@@ -68,14 +105,17 @@ def _repeat_count(value: Any) -> int:
         return 1
     try:
         count = int(value)
-    except (TypeError, ValueError):
-        raise ValueError(f"Invalid Repeat value: {value!r}")
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid repeat count: {value!r}") from exc
     if count < 0:
         raise ValueError("Repeat count cannot be negative")
     return count
 
 
 def _extract_wod_intervals(node: ZwoNode) -> List[Interval]:
+    if not isinstance(node, dict):
+        return []
+
     attrs = node.get("attrs", {}) or {}
     repeat = _repeat_count(attrs.get("Repeat"))
 
