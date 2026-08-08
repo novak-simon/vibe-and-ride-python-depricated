@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 
 from pathlib import Path
 from typing import Optional
@@ -23,6 +24,7 @@ from workout.scheduler import WorkoutScheduler, WorkoutStatus
 from .formatting import format_seconds
 from .music_player import MusicPlayer
 
+logger = logging.getLogger(__name__)
 
 def _optional_float(value: Optional[float]) -> Optional[float]:
     if value is None:
@@ -71,8 +73,6 @@ class MainWindow(QMainWindow):
         self._music_status_label = QLabel(
             f"Music: {'enabled' if self._music_player.available else 'disabled'}"
         )
-        self._music_debug_label = QLabel(self._music_player.debug_info)
-        self._music_debug_label.setWordWrap(True)
         self._interval_time_label = QLabel("Interval time: 00:00 / 00:00")
         self._workout_time_label = QLabel("Workout time: 00:00 / 00:00")
         self._status_label = QLabel("Status: no workout loaded")
@@ -103,7 +103,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._interval_detail_label)
         layout.addWidget(self._song_label)
         layout.addWidget(self._music_status_label)
-        layout.addWidget(self._music_debug_label)
         layout.addWidget(self._interval_time_label)
         layout.addWidget(self._workout_time_label)
         layout.addLayout(button_layout)
@@ -336,8 +335,6 @@ class MainWindow(QMainWindow):
             if self._music_player.available
             else "Music: disabled"
         )
-        self._music_debug_label.setText(self._music_player.debug_info)
-
         self._interval_time_label.setText(
             f"Interval time: {format_seconds(state.elapsed_in_interval)} / {format_seconds(state.remaining_in_interval)}"
         )
@@ -385,3 +382,23 @@ class MainWindow(QMainWindow):
 
         self._reset_button.setEnabled(has_workout)
         self._resync_button.setEnabled(has_workout)
+
+        if self._music_player.available and self._music_player.audio_output is not None:
+            self._music_player.audio_output.setVolume(1.0)
+            self._music_player.audio_output.setMuted(False)
+
+    def _set_current_source(self) -> None:
+        if self._current_index < 0 or self._current_index >= len(self._songs):
+            logger.warning("No current song to set")
+            return
+        source = QUrl.fromLocalFile(str(self._songs[self._current_index]))
+        logger.info("Setting music source: %s", source.toString())
+        self._player.setSource(source)
+
+    def _on_media_status_changed(self, status) -> None:
+        logger.info("Media status changed: %s", status)
+        if self._end_of_media_status is not None and status == self._end_of_media_status:
+            self.next_track()
+
+    def _on_error(self, error, error_string):
+        logger.error("Media player error: %s %s", error, error_string)
