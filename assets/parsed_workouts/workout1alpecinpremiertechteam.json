@@ -1,0 +1,126 @@
+{
+  "type": "workout_file",
+  "attrs": {},
+  "children": [
+    {
+      "type": "author",
+      "attrs": {},
+      "text": "WhatsOnZwift Exporter"
+    },
+    {
+      "type": "name",
+      "attrs": {},
+      "text": "Zwift Workout"
+    },
+    {
+      "type": "description",
+      "attrs": {},
+      "text": "Workout exported from WhatsOnZwift: https://whatsonzwift.com/workouts/new-workouts/workout-1-alpecin-premier-tech-team-camp"
+    },
+    {
+      "type": "sportType",
+      "attrs": {},
+      "text": "bike"
+    },
+    {
+      "type": "tags",
+      "attrs": {}
+    },
+    {
+      "type": "workout",
+      "attrs": {},
+      "children": [
+        {
+          "type": "Warmup",
+          "attrs": {
+            "Duration": 600,
+            "PowerLow": 0.45,
+            "PowerHigh": 0.7,
+            "Cadence": 95
+          },
+          "interval": {
+            "duration": 600,
+            "power": null,
+            "cadence": 95
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 600,
+            "Power": 0.75,
+            "Cadence": 95
+          },
+          "interval": {
+            "duration": 600,
+            "power": 0.75,
+            "cadence": 95
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 300,
+            "Power": 0.55
+          },
+          "interval": {
+            "duration": 300,
+            "power": 0.55,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 600,
+            "Power": 0.85,
+            "Cadence": 95
+          },
+          "interval": {
+            "duration": 600,
+            "power": 0.85,
+            "cadence": 95
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 300,
+            "Power": 0.55
+          },
+          "interval": {
+            "duration": 300,
+            "power": 0.55,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 600,
+            "Power": 0.95,
+            "Cadence": 95
+          },
+          "interval": {
+            "duration": 600,
+            "power": 0.95,
+            "cadence": 95
+          }
+        },
+        {
+          "type": "Cooldown",
+          "attrs": {
+            "Duration": 600,
+            "PowerLow": 0.65,
+            "PowerHigh": 0.45
+          },
+          "interval": {
+            "duration": 600,
+            "power": null,
+            "cadence": null
+          }
+        }
+      ]
+    }
+  ]
+}

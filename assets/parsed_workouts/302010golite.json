@@ -1,0 +1,684 @@
+{
+  "type": "workout_file",
+  "attrs": {},
+  "children": [
+    {
+      "type": "author",
+      "attrs": {},
+      "text": "WhatsOnZwift Exporter"
+    },
+    {
+      "type": "name",
+      "attrs": {},
+      "text": "Zwift Workout"
+    },
+    {
+      "type": "description",
+      "attrs": {},
+      "text": "Workout exported from WhatsOnZwift: https://whatsonzwift.com/workouts/new-workouts"
+    },
+    {
+      "type": "sportType",
+      "attrs": {},
+      "text": "bike"
+    },
+    {
+      "type": "tags",
+      "attrs": {}
+    },
+    {
+      "type": "workout",
+      "attrs": {},
+      "children": [
+        {
+          "type": "Warmup",
+          "attrs": {
+            "Duration": 60,
+            "Power": 0.5
+          },
+          "interval": {
+            "duration": 60,
+            "power": 0.5,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 120,
+            "Power": 0.6
+          },
+          "interval": {
+            "duration": 120,
+            "power": 0.6,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 120,
+            "Power": 0.7
+          },
+          "interval": {
+            "duration": 120,
+            "power": 0.7,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 120,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 120,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 120,
+            "Power": 0.55
+          },
+          "interval": {
+            "duration": 120,
+            "power": 0.55,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 30,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 30,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 20,
+            "Power": 0.9
+          },
+          "interval": {
+            "duration": 20,
+            "power": 0.9,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 10,
+            "Power": 1.2
+          },
+          "interval": {
+            "duration": 10,
+            "power": 1.2,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 30,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 30,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 20,
+            "Power": 0.9
+          },
+          "interval": {
+            "duration": 20,
+            "power": 0.9,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 10,
+            "Power": 1.2
+          },
+          "interval": {
+            "duration": 10,
+            "power": 1.2,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 30,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 30,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 20,
+            "Power": 0.9
+          },
+          "interval": {
+            "duration": 20,
+            "power": 0.9,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 10,
+            "Power": 1.2
+          },
+          "interval": {
+            "duration": 10,
+            "power": 1.2,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 30,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 30,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 20,
+            "Power": 0.9
+          },
+          "interval": {
+            "duration": 20,
+            "power": 0.9,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 10,
+            "Power": 1.2
+          },
+          "interval": {
+            "duration": 10,
+            "power": 1.2,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 30,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 30,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 20,
+            "Power": 0.9
+          },
+          "interval": {
+            "duration": 20,
+            "power": 0.9,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 10,
+            "Power": 1.2
+          },
+          "interval": {
+            "duration": 10,
+            "power": 1.2,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 120,
+            "Power": 0.5
+          },
+          "interval": {
+            "duration": 120,
+            "power": 0.5,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 30,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 30,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 20,
+            "Power": 0.9
+          },
+          "interval": {
+            "duration": 20,
+            "power": 0.9,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 10,
+            "Power": 1.2
+          },
+          "interval": {
+            "duration": 10,
+            "power": 1.2,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 30,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 30,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 20,
+            "Power": 0.9
+          },
+          "interval": {
+            "duration": 20,
+            "power": 0.9,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 10,
+            "Power": 1.2
+          },
+          "interval": {
+            "duration": 10,
+            "power": 1.2,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 30,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 30,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 20,
+            "Power": 0.9
+          },
+          "interval": {
+            "duration": 20,
+            "power": 0.9,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 10,
+            "Power": 1.2
+          },
+          "interval": {
+            "duration": 10,
+            "power": 1.2,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 30,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 30,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 20,
+            "Power": 0.9
+          },
+          "interval": {
+            "duration": 20,
+            "power": 0.9,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 10,
+            "Power": 1.2
+          },
+          "interval": {
+            "duration": 10,
+            "power": 1.2,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 30,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 30,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 20,
+            "Power": 0.9
+          },
+          "interval": {
+            "duration": 20,
+            "power": 0.9,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 10,
+            "Power": 1.2
+          },
+          "interval": {
+            "duration": 10,
+            "power": 1.2,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 120,
+            "Power": 0.5
+          },
+          "interval": {
+            "duration": 120,
+            "power": 0.5,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 30,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 30,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 20,
+            "Power": 0.9
+          },
+          "interval": {
+            "duration": 20,
+            "power": 0.9,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 10,
+            "Power": 1.2
+          },
+          "interval": {
+            "duration": 10,
+            "power": 1.2,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 30,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 30,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 20,
+            "Power": 0.9
+          },
+          "interval": {
+            "duration": 20,
+            "power": 0.9,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 10,
+            "Power": 1.2
+          },
+          "interval": {
+            "duration": 10,
+            "power": 1.2,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 30,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 30,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 20,
+            "Power": 0.9
+          },
+          "interval": {
+            "duration": 20,
+            "power": 0.9,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 10,
+            "Power": 1.2
+          },
+          "interval": {
+            "duration": 10,
+            "power": 1.2,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 30,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 30,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 20,
+            "Power": 0.9
+          },
+          "interval": {
+            "duration": 20,
+            "power": 0.9,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 10,
+            "Power": 1.2
+          },
+          "interval": {
+            "duration": 10,
+            "power": 1.2,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 30,
+            "Power": 0.8
+          },
+          "interval": {
+            "duration": 30,
+            "power": 0.8,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 20,
+            "Power": 0.9
+          },
+          "interval": {
+            "duration": 20,
+            "power": 0.9,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 10,
+            "Power": 1.2
+          },
+          "interval": {
+            "duration": 10,
+            "power": 1.2,
+            "cadence": null
+          }
+        },
+        {
+          "type": "SteadyState",
+          "attrs": {
+            "Duration": 120,
+            "Power": 0.5
+          },
+          "interval": {
+            "duration": 120,
+            "power": 0.5,
+            "cadence": null
+          }
+        },
+        {
+          "type": "Cooldown",
+          "attrs": {
+            "Duration": 120,
+            "Power": 0.6
+          },
+          "interval": {
+            "duration": 120,
+            "power": 0.6,
+            "cadence": null
+          }
+        }
+      ]
+    }
+  ]
+}
