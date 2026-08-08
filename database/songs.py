@@ -97,8 +97,6 @@ def get_playable_songs(client: Any) -> List[Song]:
     query = (
         client.table("songs")
         .select("*")
-        .not_("audio_url", "is", None)
-        .neq("audio_url", "")
     )
     result = query.execute()
     if isinstance(result, dict):

@@ -23,7 +23,7 @@ from workout.parser import parse_zwo_file
 from workout.scheduler import WorkoutScheduler, WorkoutStatus
 
 from .formatting import format_seconds
-from .music_player import MusicPlayer
+from music.player import MusicPlayer
 
 logger = logging.getLogger(__name__)
 
