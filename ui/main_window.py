@@ -24,6 +24,7 @@ from workout.scheduler import WorkoutScheduler, WorkoutStatus
 
 from .formatting import format_seconds
 from music.player import MusicPlayer
+from database.workouts import upload_parsed_file
 
 logger = logging.getLogger(__name__)
 

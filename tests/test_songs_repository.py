@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from database.songs import Song, add_song, get_song_by_jamendo_id, get_songs, jamendo_id_exists
 from music.model import Song

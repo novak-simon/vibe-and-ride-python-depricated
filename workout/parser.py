@@ -1,10 +1,41 @@
+from __future__ import annotations
+
+import logging
 import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+from database.workouts import upload_parsed_file
+from database.admin_client import get_admin_supabase
+admin_client = get_admin_supabase()
+
 ZwoValue = Union[str, int, float, bool, None]
 ZwoNode = Dict[str, Any]
+
+logger = logging.getLogger(__name__)
+
+
+def _set_workout_name(parsed: ZwoNode | List[ZwoNode], name: str) -> None:
+    def _replace_name_node(node: ZwoNode) -> None:
+        if node.get("type") == "name":
+            node["text"] = name
+            return
+
+        children = node.get("children")
+        if isinstance(children, list):
+            for child in children:
+                if isinstance(child, dict):
+                    _replace_name_node(child)
+
+    if isinstance(parsed, dict):
+        _replace_name_node(parsed)
+        return parsed
+
+    for item in parsed:
+        if isinstance(item, dict):
+            _replace_name_node(item)
+    return parsed
 
 
 def _parse_value(value: Optional[str]) -> ZwoValue:
@@ -106,29 +137,16 @@ def parse_zwo_string(content: str) -> Union[ZwoNode, List[ZwoNode]]:
 def parse_zwo_file(path: Union[str, Path]) -> Union[ZwoNode, List[ZwoNode]]:
     path_obj = Path(path)
     with path_obj.open("r", encoding="utf-8") as file:
-        return parse_zwo_string(file.read())
+        parsed = parse_zwo_string(file.read())
+        source = Path(path)
+        parsed = _set_workout_name(parsed, source.stem)
+        upload_parsed_file(parsed, client=admin_client)
+        return parsed
 
 
 def _default_asset_dirs() -> tuple[Path, Path]:
     base = Path(__file__).resolve().parents[1] / "assets"
     return base / "raw_workouts", base / "parsed_workouts"
-
-
-def parse_and_save_zwo_file(
-    source_path: Union[str, Path],
-    target_dir: Optional[Union[str, Path]] = None,
-) -> Path:
-    source = Path(source_path)
-    if target_dir is None:
-        _, target_dir = _default_asset_dirs()
-    target_dir = Path(target_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    parsed = parse_zwo_file(source)
-    out_path = target_dir / f"{source.stem}.json"
-    with out_path.open("w", encoding="utf-8") as file:
-        json.dump(parsed, file, indent=2, ensure_ascii=False)
-    return out_path
 
 
 def parse_all_workouts(
@@ -147,6 +165,6 @@ def parse_all_workouts(
         target_path = parsed_dir / f"{source.stem}.json"
         if target_path.exists() and not force:
             continue
-        parse_and_save_zwo_file(source, parsed_dir)
+        parse_zwo_file(source, parsed_dir)
         parsed_paths.append(target_path)
     return parsed_paths
