@@ -1,3 +1,4 @@
+#DEPRECATED, WILL BE REMOVED WHEN POSSIBLE
 from __future__ import annotations
 
 import logging
