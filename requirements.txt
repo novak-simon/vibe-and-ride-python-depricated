@@ -1,5 +1,3 @@
 PySide6
 supabase
 python-dotenv
-wheel
-numpy

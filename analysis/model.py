@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 
 @dataclass(frozen=True)
 class AudioAnalysis:
     bpm: float
-    confidence: float
-    beats: Optional[List[float]] = None
-    bpm_estimates: Optional[List[float]] = None
-    beat_intervals: Optional[List[float]] = None
+    bpm_confidence: Optional[float]
+    beats: List[float]
+    beat_intervals: List[float]
+
+    def to_record(self) -> Dict[str, Any]:
+        return {
+            "bpm": self.bpm,
+            "bpm_confidence": self.bpm_confidence,
+            "beats": self.beats,
+            "beat_intervals": self.beat_intervals,
+        }

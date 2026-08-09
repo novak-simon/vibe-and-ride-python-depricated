@@ -1,29 +1,29 @@
 from __future__ import annotations
 
 import argparse
+
+from analysis.service import AudioAnalysisService
+from database.methods import _effective_client
 from database.admin_client import get_admin_supabase
-from analysis.service import analyze_songs
 
+admin_client = get_admin_supabase()
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Analyze songs using Essentia")
-    parser.add_argument("--limit", type=int, default=50, help="Maximum number of songs to analyze")
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Analyze songs from Supabase using librosa."
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=50,
+        help="Maximum number of songs to analyze in this batch.",
+    )
     args = parser.parse_args()
 
-    client = get_admin_supabase()
-    results = analyze_songs(limit=args.limit, client=client)
-
-    for idx, (song, analysis, error) in enumerate(results, start=1):
-        if error:
-            print(f"{idx}/{len(results)}: {song.title} FAILED: {error}")
-        else:
-            print(f"{idx}/{len(results)}: {song.title}")
-            print(f"  BPM: {analysis.bpm}")
-            print(f"  Confidence: {analysis.confidence}")
-            print(f"  Beats: {len(analysis.beats or [])}")
-            print(f"  Intervals: {len(analysis.beat_intervals or [])}")
-    return 0
+    client = _effective_client(client=admin_client)
+    service = AudioAnalysisService(client)
+    service.analyze_batch(limit=args.limit)
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

@@ -1,4 +1,5 @@
 from typing import Any, List
+import supabase
 
 def _effective_client(client: Any | None) -> Any:
     return client if client is not None else supabase
