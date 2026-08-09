@@ -6,8 +6,8 @@ from typing import Any, Dict, List, Optional
 
 @dataclass(frozen=True)
 class AudioAnalysis:
-    bpm: float
-    bpm_confidence: Optional[float]
+    bpm: int
+    bpm_confidence: Optional[int]
     beats: List[float]
     beat_intervals: List[float]
 

@@ -22,7 +22,7 @@ class LibrosaAnalyzer:
 
         tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
         for temp in tempo:
-            bpm = float(temp)
+            bpm = int(temp)
 
         beat_times = librosa.frames_to_time(beat_frames, sr=sr)
         beats = [float(value) for value in beat_times]
@@ -38,7 +38,7 @@ class LibrosaAnalyzer:
         )
 
     @staticmethod
-    def _confidence_for_intervals(intervals: List[float]) -> Optional[float]:
+    def _confidence_for_intervals(intervals: List[float]) -> Optional[int]:
         if len(intervals) < 2:
             return None
 
@@ -47,6 +47,6 @@ class LibrosaAnalyzer:
             return None
 
         std_interval = float(np.std(intervals, ddof=0))
-        coefficient_of_variation = std_interval / mean_interval
-        confidence = 1.0 - coefficient_of_variation
-        return max(0.0, min(1.0, confidence))
+        coefficient_of_variation = int(std_interval / mean_interval * 1000)
+        confidence = 1000 - coefficient_of_variation
+        return max(0, min(1000, confidence))

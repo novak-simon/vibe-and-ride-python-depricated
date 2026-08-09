@@ -112,12 +112,6 @@ def _normalize_bpm_for_db(bpm: float | int | None) -> int | None:
     return int(round(float(bpm)))
 
 
-def _normalize_confidence_for_db(confidence: float | int | None) -> int | None:
-    if confidence is None:
-        return None
-    return int(round(1000 * float(confidence)))
-
-
 def update_song_analysis(
     song_id: Optional[int] = None,
     jamendo_id: Optional[str] = None,
@@ -201,9 +195,7 @@ def update_song_analysis(client, song_id: int, analysis: AudioAnalysis) -> None:
         "bpm": _normalize_bpm_for_db(analysis.bpm),
         "beats": analysis.beats,
         "beat_intervals": analysis.beat_intervals,
-        "bpm_confidence": _normalize_confidence_for_db(
-            analysis.bpm_confidence
-        ),
+        "bpm_confidence": analysis.bpm_confidence
     }
     query = table.update(record).eq("id", song_id)
     _execute_query(query)
