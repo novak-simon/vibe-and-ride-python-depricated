@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 @dataclass(frozen=True)
@@ -16,6 +16,9 @@ class Song:
     bpm_confidence: int = 0
     audio_url: Optional[str] = None
     download_url: Optional[str] = None
+    beats: Optional[List[float]] = None
+    bpm_estimates: Optional[List[float]] = None
+    beat_intervals: Optional[List[float]] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Song":
@@ -30,19 +33,25 @@ class Song:
             bpm_confidence=_optional_int(data.get("bpm_confidence"), default=0),
             audio_url=_optional_str(data.get("audio_url")),
             download_url=_optional_str(data.get("download_url")),
+            beats=_optional_float_list(data.get("beats")),
+            bpm_estimates=_optional_float_list(data.get("bpm_estimates")),
+            beat_intervals=_optional_float_list(data.get("beat_intervals")),
         )
 
     def to_record(self) -> Dict[str, Any]:
         return {
             "title": self.title,
-            "artist": self.artist,
             "jamendo_id": self.jamendo_id,
+            "artist": self.artist,
             "genre": self.genre,
             "speed": self.speed,
             "bpm": self.bpm,
             "bpm_confidence": self.bpm_confidence,
             "audio_url": self.audio_url,
             "download_url": self.download_url,
+            "beats": self.beats,
+            "bpm_estimates": self.bpm_estimates,
+            "beat_intervals": self.beat_intervals,
         }
 
 
@@ -62,3 +71,11 @@ def _optional_int_or_none(value: Any) -> Optional[int]:
     if value is None:
         return None
     return int(value)
+
+
+def _optional_float_list(value: Any) -> Optional[List[float]]:
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return [float(item) for item in value]
+    return [float(item) for item in list(value)]

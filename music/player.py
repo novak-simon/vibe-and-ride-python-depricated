@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
+
 try:
     from PySide6.QtCore import QUrl
     from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
@@ -11,22 +12,21 @@ except ImportError as exc:
     QUrl = QAudioOutput = QMediaPlayer = None
     _PYSIDE6_MULTIMEDIA_ERROR = exc
 
-from database.client import supabase
-from database.songs import get_playable_songs
 from music.model import Song
-
+from music.provider import SongProvider
 
 logger = logging.getLogger(__name__)
 
 MUSIC_ENABLED = True
-AUDIO_EXTENSIONS = {".mp3", ".wav", ".ogg", ".flac", ".m4a"}
+
 
 class MusicPlayer:
     def __init__(self, song_directory: Path, *args, **kwargs) -> None:
         self._player = None
         self._audio_output = None
-        self._songs: List[Song] = []
-        self._current_index = -1
+        self._provider = SongProvider(song_directory)
+        self._songs = self._provider.songs()
+        self._current_index = self._provider._current_index
         self._debug_info = ""
         self._backend_error = _PYSIDE6_MULTIMEDIA_ERROR
         self._backend_available = (
@@ -35,13 +35,14 @@ class MusicPlayer:
             and QUrl is not None
         )
         self._end_of_media_status = None
+
         if not self._backend_available:
             logger.warning(
                 "Qt Multimedia backend unavailable; music disabled: %s",
                 self._backend_error,
             )
             return
-        
+
         self._player = QMediaPlayer()
         self._audio_output = QAudioOutput()
         if hasattr(self._audio_output, "setVolume"):
@@ -50,10 +51,8 @@ class MusicPlayer:
             self._audio_output.setMuted(False)
         self._player.setAudioOutput(self._audio_output)
 
-        if self._backend_available:
-            self._load_songs_from_database()
-            if not self._songs:
-                self._load_local_songs(song_directory)
+        if self._provider.has_songs():
+            self._set_current_source()
 
         self._end_of_media_status = getattr(QMediaPlayer, "EndOfMedia", None)
         if self._end_of_media_status is None:
@@ -71,44 +70,7 @@ class MusicPlayer:
             "MusicPlayer initialized: backend available=%s, songs=%d",
             self._backend_available,
             len(self._songs),
-                )
-
-    def _load_songs_from_database(self) -> None:
-        try:
-            songs = get_playable_songs(client=supabase)
-        except Exception as exc:
-            logger.exception("Could not load songs from Supabase")
-            self._database_error = exc
-            return
-
-        if not songs:
-            return
-        
-        self._songs = songs
-        """
-        for song in songs:
-            self._add_song_source(song)
-        """
-        self._current_index = 0
-
-    def _load_local_songs(self, song_directory: Path) -> None:
-        if not song_directory.exists() or not song_directory.is_dir():
-            return
-
-        for path in sorted(song_directory.iterdir()):
-            if path.suffix.lower() not in AUDIO_EXTENSIONS:
-                continue
-
-            song = Song(
-                title=path.stem,
-                jamendo_id=f"local-{path.name}",
-                audio_url=str(path),
-            )
-            self._songs.append(song)
-            self._add_song_source(song)
-
-        if self._songs:
-            self._current_index = 0
+        )
 
     @property
     def available(self) -> bool:
@@ -127,22 +89,22 @@ class MusicPlayer:
             f"current_index={self._current_index}"
         )
 
-    def _add_song_source(self, song: Song) -> None:
-        if song.audio_url is None or QUrl is None:
+    def _set_current_source(self) -> None:
+        song = self._provider.get_current_song()
+        if song is None or song.audio_url is None or QUrl is None:
             return
 
         if song.audio_url.startswith(("http://", "https://")):
             source = QUrl(song.audio_url)
         else:
             source = QUrl.fromLocalFile(song.audio_url)
+
         if hasattr(self._player, "setSource"):
             self._player.setSource(source)
 
     def current_song_name(self) -> Optional[str]:
-        if self._current_index < 0 or self._current_index >= len(self._songs):
-            return None
-        song = self._songs[self._current_index]
-        if not song.title:
+        song = self._provider.get_current_song()
+        if song is None or not song.title:
             return None
         if song.artist:
             return f"{song.title} — {song.artist}"
@@ -151,8 +113,8 @@ class MusicPlayer:
     def play(self) -> None:
         if not self.available or self._player is None:
             return
-        if self._current_index < 0 and self._songs:
-            self._current_index = 0
+        if self._provider.get_current_song() is None and self._provider.has_songs():
+            self._provider._current_index = 0
             self._set_current_source()
         self._player.play()
 
@@ -165,10 +127,12 @@ class MusicPlayer:
             self._player.stop()
 
     def next_track(self) -> None:
-        if not self.available or self._player is None or not self._songs:
+        if not self.available or self._player is None or not self._provider.has_songs():
             return
-        self._current_index = (self._current_index + 1) % len(self._songs)
-        self._add_song_source(self._songs[self._current_index])
+        self._provider.next_song()
+        self._songs = self._provider.songs()
+        self._current_index = self._provider._current_index
+        self._set_current_source()
         self._player.play()
 
     def _on_media_status_changed(self, status) -> None:
