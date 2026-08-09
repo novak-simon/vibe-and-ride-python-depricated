@@ -146,13 +146,25 @@ def parse_zwo_file(path: Union[str, Path]) -> Union[ZwoNode, List[ZwoNode]]:
 
 def _default_asset_dirs() -> tuple[Path, Path]:
     base = Path(__file__).resolve().parents[1] / "assets"
-    return base / "raw_workouts"
+    return base / "raw_workouts", base / "parsed_workouts"
 
 
-def parse_all_workouts(raw_dir: Optional[Union[str, Path]] = None) -> List[Path]:
-    if raw_dir is None:
-        raw_dir = _default_asset_dirs()
+def parse_all_workouts(
+    raw_dir: Optional[Union[str, Path]] = None,
+    parsed_dir: Optional[Union[str, Path]] = None,
+    force: bool = False,
+) -> List[Path]:
+    if raw_dir is None or parsed_dir is None:
+        raw_dir, parsed_dir = _default_asset_dirs()
     raw_dir = Path(raw_dir)
+    parsed_dir = Path(parsed_dir)
+    parsed_dir.mkdir(parents=True, exist_ok=True)
 
+    parsed_paths: List[Path] = []
     for source in sorted(raw_dir.glob("*.zwo")):
-        parse_zwo_file(source)
+        target_path = parsed_dir / f"{source.stem}.json"
+        if target_path.exists() and not force:
+            continue
+        parse_zwo_file(source, parsed_dir)
+        parsed_paths.append(target_path)
+    return parsed_paths
