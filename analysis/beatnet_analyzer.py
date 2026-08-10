@@ -136,9 +136,7 @@ class BeatnetAnalyzer:
         if mean_interval <= 0:
             return None
         std_interval = float(np.std(intervals, ddof=0))
-        print(f"mean: {mean_interval}, std: {std_interval}")
         coefficient_of_variation = int(std_interval / mean_interval * 1000)
-        print(f"variation coeff: {coefficient_of_variation}")
         confidence = 1000 - coefficient_of_variation
         return max(0, min(1000, confidence))
 

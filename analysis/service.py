@@ -108,18 +108,18 @@ class AudioAnalysisService:
 
     def _merge_analysis(self, analysis1: AudioAnalysis, analysis2: AudioAnalysis) -> AudioAnalysis:
         relation = analysis2.bpm / analysis1.bpm
-        tolerance = 0.1
-        if math.isclose(relation, 2, rel_tol=tolerance):
+        tolerance = 0.15
+        if 2-tolerance < relation and relation < 2+tolerance:
             relation_estimate = 2
-        if math.isclose(relation, 3, rel_tol=tolerance):
+        elif 3-tolerance < relation and relation < 3+tolerance:
             relation_estimate = 3
-        if math.isclose(relation, 4, rel_tol=tolerance):
+        elif 4-tolerance < relation and relation < 4+tolerance:
             relation_estimate = 4
-        if math.isclose(relation, 1/2, rel_tol=tolerance):
+        elif 1/2 - tolerance < relation and relation < 1/2 + tolerance:
             relation_estimate = 0.5
-        if math.isclose(relation, 1/3, rel_tol=tolerance):
+        elif 1/3-tolerance < relation and relation < 1/3+tolerance:
             relation_estimate = 1/3
-        if math.isclose(relation, 1/4, rel_tol=tolerance):
+        elif 1/4-tolerance < relation and relation < 1/4+tolerance:
             relation_estimate = 1/4
         else:
             relation_estimate = 1
@@ -133,7 +133,7 @@ class AudioAnalysisService:
             analysis2intervals = analysis2.beat_intervals
             analysis1intervals = analysis1.beat_intervals[::k]
         final_bpm = round((analysis1.bpm * analysis1.bpm_confidence + analysis2bpm  * analysis2.bpm_confidence) / (analysis1.bpm_confidence + analysis2.bpm_confidence))
-        final_confidence = round((analysis1.bpm_confidence if analysis2.bpm_confidence == 0 else ((analysis1.bpm_confidence + analysis2.bpm_confidence) / 2)) - math.sqrt(abs(analysis1.bpm - analysis2bpm)))
+        final_confidence = round((analysis1.bpm_confidence if analysis2.bpm_confidence == 0 else ((analysis1.bpm_confidence + analysis2.bpm_confidence) / 2)) - 3 * math.sqrt(abs(analysis1.bpm - analysis2bpm)))
         final_intervals = []
         for i in range(max(len(analysis1intervals), len(analysis2intervals))):
             if i < len(analysis1intervals):
