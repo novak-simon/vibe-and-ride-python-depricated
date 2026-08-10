@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 class AudioAnalysisService:
     def __init__(self, db_client) -> None:
         self.db_client = db_client
-        self.analyzer = LibrosaAnalyzer()
-        self.alternative_analyzer = BeatnetAnalyzer()
+        self.librosa_analyzer = LibrosaAnalyzer()
+        self.beatnet_analyzer = BeatnetAnalyzer()
 
     def analyze_batch(self, limit: int = 50, force: bool = False) -> None:
         if force:
@@ -47,9 +47,9 @@ class AudioAnalysisService:
     def analyze_song(self, song: Song) -> None:
         try:
             with self._prepare_local_audio(song) as audio_path:
-                analysis = self.analyzer.analyze(audio_path)
-                alternative_analysis = self.alternative_analyzer.analyze(audio_path)
-                final_analysis: AudioAnalysis = self._merge_analysis(analysis, alternative_analysis)
+                librosa_analysis = self.librosa_analyzer.analyze(audio_path)
+                beatnet_analysis = self.beatnet_analyzer.analyze(audio_path)
+                final_analysis: AudioAnalysis = self._merge_analysis(librosa_analysis, beatnet_analysis)
 
             update_song_analysis(self.db_client, song.id, final_analysis)
 
@@ -106,9 +106,7 @@ class AudioAnalysisService:
 
         return local_path
 
-    def _merge_analysis(self, analysis1: AudioAnalysis, analysis2: AudioAnalysis) -> AudioAnalysis:
-        relation = analysis2.bpm / analysis1.bpm
-        tolerance = 0.15
+    def _calculate_relation_estimate(self, relation: float, tolerance: float) -> float:
         if 2-tolerance < relation and relation < 2+tolerance:
             relation_estimate = 2
         elif 3-tolerance < relation and relation < 3+tolerance:
@@ -123,34 +121,76 @@ class AudioAnalysisService:
             relation_estimate = 1/4
         else:
             relation_estimate = 1
-        analysis2bpm = analysis2.bpm / relation_estimate
+        return relation_estimate
+
+    def _normalize_by_relation_estimate(self, relation_estimate: float, librosa_analysis: AudioAnalysis, beatnet_analysis: AudioAnalysis):
+        beatnet_analysis_bpm = beatnet_analysis.bpm / relation_estimate
+        librosa_analysis_bpm = librosa_analysis.bpm
         if relation_estimate > 1:
             k = int(relation_estimate)
-            analysis2intervals = analysis2.beat_intervals[::k]
-            analysis1intervals = analysis1.beat_intervals
+            beatnet_analysis_intervals = beatnet_analysis.beat_intervals[::k]
+            librosa_analysis_intervals = librosa_analysis.beat_intervals
         else:
             k = int(1 / relation_estimate)
-            analysis2intervals = analysis2.beat_intervals
-            analysis1intervals = analysis1.beat_intervals[::k]
-        final_bpm = round((analysis1.bpm * analysis1.bpm_confidence + analysis2bpm  * analysis2.bpm_confidence) / (analysis1.bpm_confidence + analysis2.bpm_confidence))
-        final_confidence = round((analysis1.bpm_confidence if analysis2.bpm_confidence == 0 else ((analysis1.bpm_confidence + analysis2.bpm_confidence) / 2)) - 3 * math.sqrt(abs(analysis1.bpm - analysis2bpm)))
+            beatnet_analysis_intervals = beatnet_analysis.beat_intervals
+            librosa_analysis_intervals = librosa_analysis.beat_intervals[::k]
+        return librosa_analysis_bpm, beatnet_analysis_bpm, librosa_analysis_intervals, beatnet_analysis_intervals
+    
+    def _calculate_final_bpm_and_confidence(self, librosa_bpm: float, beatnet_bpm: float, librosa_confidence: float, beatnet_confidence: float) -> int:
+        if abs(librosa_confidence - beatnet_confidence) > 100:
+            if librosa_confidence > beatnet_confidence:
+                final_bpm = librosa_bpm
+                final_confidence = librosa_confidence - 100
+            else:
+                final_bpm = beatnet_bpm
+                final_confidence = beatnet_confidence - 100
+        elif abs(librosa_bpm - beatnet_bpm) > 15:
+            final_bpm = beatnet_bpm
+            final_confidence = beatnet_confidence - 100
+        else:
+            final_bpm = (librosa_bpm * librosa_confidence + beatnet_bpm  * beatnet_confidence) / (librosa_confidence + beatnet_confidence)
+            bpm_diff = abs(librosa_bpm - beatnet_bpm)
+            matchCoefficient = -1 * math.pow(bpm_diff - 5, 3)
+            final_confidence = (librosa_confidence if beatnet_confidence == 0 else ((librosa_confidence + beatnet_confidence) / 2)) + matchCoefficient
+        if final_confidence > 1000:
+            final_confidence = 1000
+        elif final_confidence < 0:
+            final_confidence = 0
+        if final_bpm > 160:
+            final_bpm /= 2
+        elif final_bpm < 40:
+            final_bpm *= 2
+        return int(round(final_bpm)), int(round(final_confidence))
+
+    def _merge_intervals(self, librosa_intervals: List[float], beatnet_intervals: List[float]) -> List[float]:
         final_intervals = []
-        for i in range(max(len(analysis1intervals), len(analysis2intervals))):
-            if i < len(analysis1intervals):
-                interval1 = analysis1intervals[i]
+        for i in range(max(len(librosa_intervals), len(beatnet_intervals))):
+            if i < len(librosa_intervals):
+                librosa_interval = librosa_intervals[i]
             else:
-                interval1 = None
-            if i < len(analysis2intervals):
-                interval2 = analysis2intervals[i]
+                librosa_interval = None
+            if i < len(beatnet_intervals):
+                beatnet_interval = beatnet_intervals[i]
             else:
-                interval2 = None
-            if interval2 is None:
-                final_intervals.append(interval1)
+                beatnet_interval = None
+            if beatnet_interval is None:
+                final_intervals.append(librosa_interval)
                 continue
-            elif interval1 is None:
-                final_intervals.append(interval2)
+            elif librosa_interval is None:
+                final_intervals.append(beatnet_interval)
                 continue
-            final_intervals.append(interval1 + interval2 / 2)
+            final_intervals.append(librosa_interval + beatnet_interval / 2)
+        return final_intervals
+        
+
+    def _merge_analysis(self, librosa_analysis: AudioAnalysis, beatnet_analysis: AudioAnalysis) -> AudioAnalysis:
+        relation = beatnet_analysis.bpm / librosa_analysis.bpm
+        tolerance = 0.15
+        relation_estimate = self._calculate_relation_estimate(relation, tolerance)
+        librosa_analysis_bpm, beatnet_analysis_bpm, librosa_analysis_intervals, beatnet_analysis_intervals = self._normalize_by_relation_estimate(relation_estimate, librosa_analysis, beatnet_analysis)
+        final_bpm, final_confidence = self._calculate_final_bpm_and_confidence(librosa_analysis_bpm, beatnet_analysis_bpm, librosa_analysis.bpm_confidence, beatnet_analysis.bpm_confidence)
+        final_intervals = self._merge_intervals(librosa_analysis_intervals, beatnet_analysis_intervals)
+
         final_analysis: AudioAnalysis = AudioAnalysis(
         bpm= final_bpm,
         bpm_confidence= final_confidence,
