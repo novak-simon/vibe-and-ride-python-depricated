@@ -99,56 +99,6 @@ def get_playable_songs(client: Any) -> List[Song]:
 
     return [Song.from_dict(row) for row in rows]
 
-
-def get_songs_needing_analysis(
-    client: Any | None = None,
-    limit: Optional[int] = None,
-) -> List[Song]:
-    client = _effective_client(client)
-    query = (
-        client.table("songs")
-        .select("*")
-        .not_("audio_url", "is", None)
-        .neq("audio_url", "")
-        .is_("bpm", "is", None)
-    )
-    if limit is not None:
-        query = query.limit(limit)
-    rows = _extract_data(query.execute())
-    return [_song_from_record(row) for row in rows]
-"""
-def update_song_analysis(
-    song_id: Optional[int] = None,
-    jamendo_id: Optional[str] = None,
-    bpm: float = 0.0,
-    bpm_confidence: float = 0.0,
-    beat_intervals: Optional[List[float]] = None,
-    client: Any | None = None,
-) -> Song:
-    if song_id is None and not jamendo_id:
-        raise ValueError("song_id or jamendo_id is required to update analysis")
-
-    client = _effective_client(client)
-    payload = {
-        "bpm": bpm,
-        "bpm_confidence": bpm_confidence,
-        "beat_intervals": beat_intervals,
-    }
-
-    query = client.table("songs").update(payload)
-    if song_id is not None:
-        query = query.eq("id", song_id)
-    else:
-        query = query.eq("jamendo_id", jamendo_id)
-
-    rows = _extract_data(query.select("*").execute())
-    if not rows:
-        raise RuntimeError("Failed to update song analysis")
-    return _song_from_record(rows[0])
-"""
-
-
-
 def fetch_unanalyzed_songs(client, limit: int = 50) -> List[Song]:
     table = _get_table(client, "songs")
     try:
@@ -169,6 +119,22 @@ def fetch_unanalyzed_songs(client, limit: int = 50) -> List[Song]:
         ][:limit]
 
     return [Song.from_dict(row) for row in rows]
+
+def fetch_songs(client, limit: int = 50) -> List[Song]:
+    table = _get_table(client, "songs")
+    try:
+        query = (
+            table.select("*")
+            .limit(limit)
+        )
+        rows = _execute_query(query)
+    except Exception:
+        fallback_limit = max(limit * 4, 1000)
+        rows = _execute_query(table.select("*").limit(fallback_limit))
+        rows = rows[:limit]
+
+    return [Song.from_dict(row) for row in rows]
+
 
 
 def update_song_analysis(client, song_id: int, analysis: AudioAnalysis) -> None:

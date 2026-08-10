@@ -22,8 +22,11 @@ class LibrosaAnalyzer:
 
         tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
         bpm = []
-        for temp in tempo:
-            bpm.append(round(temp))
+        if isinstance(tempo, float):
+            bpm.append(tempo)
+        else:
+            for temp in tempo:
+                bpm.append(round(temp))
 
         beat_times = librosa.frames_to_time(beat_frames, sr=sr)
         beats = [float(value) for value in beat_times]

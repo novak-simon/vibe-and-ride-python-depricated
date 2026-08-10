@@ -10,7 +10,7 @@ from typing import Iterator, Optional, List
 import numpy as np
 import math
 
-from database.songs import fetch_unanalyzed_songs, update_song_analysis, get_song_by_id
+from database.songs import fetch_unanalyzed_songs, update_song_analysis, get_song_by_id, fetch_songs
 from analysis.librosa_analyzer import LibrosaAnalyzer
 from analysis.beatnet_analyzer import BeatnetAnalyzer
 from analysis.model import AudioAnalysis
@@ -25,8 +25,11 @@ class AudioAnalysisService:
         self.analyzer = LibrosaAnalyzer()
         self.alternative_analyzer = BeatnetAnalyzer()
 
-    def analyze_batch(self, limit: int = 50) -> None:
-        songs = fetch_unanalyzed_songs(self.db_client, limit=limit)
+    def analyze_batch(self, limit: int = 50, force: bool = False) -> None:
+        if force:
+            songs = fetch_songs(self.db_client, limit=limit)
+        else:
+            songs = fetch_unanalyzed_songs(self.db_client, limit=limit)
         if not songs:
             print("No songs found for analysis.")
             return
@@ -130,7 +133,7 @@ class AudioAnalysisService:
             analysis2intervals = analysis2.beat_intervals
             analysis1intervals = analysis1.beat_intervals[::k]
         final_bpm = round((analysis1.bpm * analysis1.bpm_confidence + analysis2bpm  * analysis2.bpm_confidence) / (analysis1.bpm_confidence + analysis2.bpm_confidence))
-        final_confidence = analysis1.bpm_confidence if analysis2.bpm_confidence == 0 else round((analysis1.bpm_confidence + analysis2.bpm_confidence) / 2)
+        final_confidence = round((analysis1.bpm_confidence if analysis2.bpm_confidence == 0 else ((analysis1.bpm_confidence + analysis2.bpm_confidence) / 2)) - math.sqrt(abs(analysis1.bpm - analysis2bpm)))
         final_intervals = []
         for i in range(max(len(analysis1intervals), len(analysis2intervals))):
             if i < len(analysis1intervals):

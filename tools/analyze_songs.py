@@ -24,12 +24,18 @@ def main() -> None:
         default=0,
         help="Specify a song you want to analyze by ID in the database."
     )
+    parser.add_argument(
+        "--force",
+        type=bool,
+        default=False,
+        help="If set True, analyzer will analyze songs even if they were previously analyzed and will update the values in database."
+    )
     args = parser.parse_args()
 
     client = _effective_client(client=admin_client)
     service = AudioAnalysisService(client)
     if args.id == 0:
-        service.analyze_batch(limit=args.limit)
+        service.analyze_batch(limit=args.limit, force=args.force)
     else:
         service.analyze_by_id(id=args.id)
 
