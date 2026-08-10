@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 from analysis.model import AudioAnalysis
 from music.model import Song
 from dotenv import load_dotenv
-from database.methods import _effective_client, _extract_data
+from database.methods import _effective_client, _extract_data, _get_table, _execute_query
 
 def _song_from_record(record: dict[str, Any]) -> Song:
     return Song.from_dict(record)
@@ -19,6 +19,18 @@ def get_song_by_jamendo_id(
         client.table("songs")
         .select("*")
         .eq("jamendo_id", jamendo_id)
+        .limit(1)
+        .execute()
+    )
+    records = _extract_data(response)
+    return _song_from_record(records[0]) if records else None
+
+def get_song_by_id(id: int, client: Any | None = None) -> Optional[Song]:
+    client = _effective_client(client)
+    response = (
+        client.table("songs")
+        .select("*")
+        .eq("id", id)
         .limit(1)
         .execute()
     )
@@ -105,20 +117,11 @@ def get_songs_needing_analysis(
     rows = _extract_data(query.execute())
     return [_song_from_record(row) for row in rows]
 
-
-def _normalize_bpm_for_db(bpm: float | int | None) -> int | None:
-    if bpm is None:
-        return None
-    return int(round(float(bpm)))
-
-
 def update_song_analysis(
     song_id: Optional[int] = None,
     jamendo_id: Optional[str] = None,
     bpm: float = 0.0,
     bpm_confidence: float = 0.0,
-    beats: Optional[List[float]] = None,
-    bpm_estimates: Optional[List[float]] = None,
     beat_intervals: Optional[List[float]] = None,
     client: Any | None = None,
 ) -> Song:
@@ -127,10 +130,8 @@ def update_song_analysis(
 
     client = _effective_client(client)
     payload = {
-        "bpm": _normalize_bpm_for_db(bpm),
+        "bpm": bpm,
         "bpm_confidence": bpm_confidence,
-        "beats": beats,
-        "bpm_estimates": bpm_estimates,
         "beat_intervals": beat_intervals,
     }
 
@@ -146,32 +147,14 @@ def update_song_analysis(
     return _song_from_record(rows[0])
 
 
-def _get_table(client):
-    table_method = getattr(client, "table", None) or getattr(client, "from_", None)
-    if table_method is None:
-        raise AttributeError("Supabase client must expose table() or from_()")
-    return table_method("songs")
-
-
-def _execute_query(query):
-    response = query.execute()
-    if isinstance(response, dict):
-        error = response.get("error")
-        data = response.get("data", [])
-    else:
-        error = getattr(response, "error", None)
-        data = getattr(response, "data", [])
-    if error:
-        raise RuntimeError(f"Supabase error: {error}")
-    return data or []
 
 
 def fetch_unanalyzed_songs(client, limit: int = 50) -> List[Song]:
-    table = _get_table(client)
+    table = _get_table(client, "songs")
     try:
         query = (
             table.select("*")
-            .or_("bpm.is.null,beats.is.null,beat_intervals.is.null")
+            .or_("bpm.is.null,beat_intervals.is.null")
             .limit(limit)
         )
         rows = _execute_query(query)
@@ -182,7 +165,6 @@ def fetch_unanalyzed_songs(client, limit: int = 50) -> List[Song]:
             row
             for row in rows
             if row.get("bpm") is None
-            or row.get("beats") is None
             or row.get("beat_intervals") is None
         ][:limit]
 
@@ -190,10 +172,9 @@ def fetch_unanalyzed_songs(client, limit: int = 50) -> List[Song]:
 
 
 def update_song_analysis(client, song_id: int, analysis: AudioAnalysis) -> None:
-    table = _get_table(client)
+    table = _get_table(client, "songs")
     record: Dict[str, Any] = {
-        "bpm": _normalize_bpm_for_db(analysis.bpm),
-        "beats": analysis.beats,
+        "bpm": analysis.bpm,
         "beat_intervals": analysis.beat_intervals,
         "bpm_confidence": analysis.bpm_confidence
     }

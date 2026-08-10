@@ -21,17 +21,25 @@ class LibrosaAnalyzer:
             raise ValueError(f"Unable to decode audio from {audio_path}")
 
         tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
+        bpm = []
         for temp in tempo:
-            bpm = int(temp)
+            bpm.append(round(temp))
 
         beat_times = librosa.frames_to_time(beat_frames, sr=sr)
         beats = [float(value) for value in beat_times]
         beat_intervals = [
             float(beats[i + 1] - beats[i]) for i in range(len(beats) - 1)
         ]
+        processed_intervals = self._remove_anomalies(beat_intervals)
+        calculated_bpm = 60 / np.mean(processed_intervals)
+        alternative_bpm = 60 / np.median(beat_intervals)
+        bpm.append(calculated_bpm)
+        bpm.append(alternative_bpm)
+        final_bpm_estimate = round(np.mean(bpm))
+        
 
         return AudioAnalysis(
-            bpm=bpm,
+            bpm=final_bpm_estimate,
             bpm_confidence=self._confidence_for_intervals(beat_intervals),
             beats=beats,
             beat_intervals=beat_intervals,
@@ -50,3 +58,17 @@ class LibrosaAnalyzer:
         coefficient_of_variation = int(std_interval / mean_interval * 1000)
         confidence = 1000 - coefficient_of_variation
         return max(0, min(1000, confidence))
+
+    @staticmethod
+    def _remove_anomalies(intervals: List[float]) -> List[float]:
+        std_interval = float(np.std(intervals, ddof=0))
+        mean_interval = float(np.mean(intervals))
+        if mean_interval <= 0:
+            return None
+        processed_intervals = []
+        for i in range(len(intervals)):
+            value = intervals[i]
+            if not value > mean_interval + 0.3 * std_interval or value < mean_interval - 0.3 * std_interval:
+                processed_intervals.append(value)
+        return processed_intervals
+        

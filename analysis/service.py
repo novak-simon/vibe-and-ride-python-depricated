@@ -8,7 +8,7 @@ import urllib.request
 from contextlib import contextmanager
 from typing import Iterator, Optional
 
-from database.songs import fetch_unanalyzed_songs, update_song_analysis
+from database.songs import fetch_unanalyzed_songs, update_song_analysis, get_song_by_id
 from analysis.librosa_analyzer import LibrosaAnalyzer
 from music.model import Song
 
@@ -28,21 +28,31 @@ class AudioAnalysisService:
 
         for index, song in enumerate(songs, start=1):
             print(f"Analyzing {index}/{len(songs)}: {song.title}")
-            try:
-                with self._prepare_local_audio(song) as audio_path:
-                    analysis = self.analyzer.analyze(audio_path)
+            self.analyze_song(song)
 
-                update_song_analysis(self.db_client, song.id, analysis)
+    def analyze_by_id(self, id: int) -> None:
+        song = get_song_by_id(id, self.db_client)
+        print(f"Analyzing {song.title}")
+        self.analyze_song(song)
 
-                print(f"  BPM: {analysis.bpm:.2f}")
-                print(
-                    f"  Confidence: "
-                    f"{analysis.bpm_confidence if analysis.bpm_confidence is not None else 'None'}"
-                )
-                print(f"  Beats: {len(analysis.beats)}")
-            except Exception as err:
-                logger.exception("Failed to analyze song %s (%s)", song.title, song.id)
-                print(f"  FAILED: {err}")
+
+    def analyze_song(self, song: Song) -> None:
+        try:
+            with self._prepare_local_audio(song) as audio_path:
+                analysis = self.analyzer.analyze(audio_path)
+
+            update_song_analysis(self.db_client, song.id, analysis)
+
+            print(f"  BPM: {analysis.bpm}")
+            print(
+                f"  Confidence: "
+                f"{analysis.bpm_confidence if analysis.bpm_confidence is not None else 'None'}"
+            )
+            print(f"  Beats: {len(analysis.beats)}")
+        except Exception as err:
+            logger.exception("Failed to analyze song %s (%s)", song.title, song.id)
+            print(f"  FAILED: {err}")
+
 
     @contextmanager
     def _prepare_local_audio(self, song: Song) -> Iterator[str]:

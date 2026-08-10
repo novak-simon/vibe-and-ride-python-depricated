@@ -18,11 +18,20 @@ def main() -> None:
         default=50,
         help="Maximum number of songs to analyze in this batch.",
     )
+    parser.add_argument(
+        "--id",
+        type=int,
+        default=0,
+        help="Specify a song you want to analyze by ID in the database."
+    )
     args = parser.parse_args()
 
     client = _effective_client(client=admin_client)
     service = AudioAnalysisService(client)
-    service.analyze_batch(limit=args.limit)
+    if args.id == 0:
+        service.analyze_batch(limit=args.limit)
+    else:
+        service.analyze_by_id(id=args.id)
 
 
 if __name__ == "__main__":
