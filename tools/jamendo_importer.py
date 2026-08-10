@@ -127,6 +127,8 @@ def jamendo_result_to_song(result: Dict[str, Any]) -> Song:
         tags = {}
 
     genre = _normalize_genre(tags.get("genres"))
+    if not genre == None:
+        genre = genre.split(",")
     speed = jamendo_speed_to_int(musicinfo.get("speed"))
 
     # extract audio/download urls safely

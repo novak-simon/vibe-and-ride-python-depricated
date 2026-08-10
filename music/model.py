@@ -10,14 +10,13 @@ class Song:
     jamendo_id: str
     id: Optional[int] = None
     artist: Optional[str] = None
-    genre: Optional[str] = None
+    genre: List[str] = None
     speed: int = 0
     bpm: int = 0
     bpm_confidence: int = 0
+    beat_intervals: Optional[List[float]] = None
     audio_url: Optional[str] = None
     download_url: Optional[str] = None
-    beats: Optional[List[float]] = None
-    bpm_estimates: Optional[List[float]] = None
     beat_intervals: Optional[List[float]] = None
 
     @classmethod
@@ -33,8 +32,6 @@ class Song:
             bpm_confidence=_optional_int(data.get("bpm_confidence"), default=0),
             audio_url=_optional_str(data.get("audio_url")),
             download_url=_optional_str(data.get("download_url")),
-            beats=_optional_float_list(data.get("beats")),
-            bpm_estimates=_optional_float_list(data.get("bpm_estimates")),
             beat_intervals=_optional_float_list(data.get("beat_intervals")),
         )
 
@@ -49,8 +46,6 @@ class Song:
             "bpm_confidence": self.bpm_confidence,
             "audio_url": self.audio_url,
             "download_url": self.download_url,
-            "beats": self.beats,
-            "bpm_estimates": self.bpm_estimates,
             "beat_intervals": self.beat_intervals,
         }
 

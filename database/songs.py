@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Optional
 
 from analysis.model import AudioAnalysis
 from music.model import Song
-from dotenv import load_dotenv
 from database.methods import _effective_client, _extract_data, _get_table, _execute_query
 
 def _song_from_record(record: dict[str, Any]) -> Song:
