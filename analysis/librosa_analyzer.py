@@ -38,7 +38,7 @@ class LibrosaAnalyzer:
         alternative_bpm = 60 / np.median(beat_intervals)
         bpm.append(calculated_bpm)
         bpm.append(alternative_bpm)
-        final_bpm_estimate = round(np.mean(bpm))
+        final_bpm_estimate = int(round(np.nan_to_num(np.nanmean(bpm))))
         print(f"Librosa BPM: {final_bpm_estimate}")
         print(f"Librosa confidence: {self._confidence_for_intervals(beat_intervals)}")
         
