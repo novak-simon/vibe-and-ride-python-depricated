@@ -41,7 +41,6 @@ class LibrosaAnalyzer:
         return AudioAnalysis(
             bpm=final_bpm_estimate,
             bpm_confidence=self._confidence_for_intervals(beat_intervals),
-            beats=beats,
             beat_intervals=beat_intervals,
         )
 

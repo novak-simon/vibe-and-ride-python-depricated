@@ -116,7 +116,7 @@ def get_songs_needing_analysis(
         query = query.limit(limit)
     rows = _extract_data(query.execute())
     return [_song_from_record(row) for row in rows]
-
+"""
 def update_song_analysis(
     song_id: Optional[int] = None,
     jamendo_id: Optional[str] = None,
@@ -145,7 +145,7 @@ def update_song_analysis(
     if not rows:
         raise RuntimeError("Failed to update song analysis")
     return _song_from_record(rows[0])
-
+"""
 
 
 
