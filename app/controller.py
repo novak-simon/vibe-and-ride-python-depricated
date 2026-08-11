@@ -1,0 +1,169 @@
+"""
+Application controller: separates workout/music logic from UI.
+
+Responsibilities:
+- Load and parse workout files
+- Build Workout objects from parsed content
+- Create WorkoutScheduler and notify music provider to precompute recommendations
+"""
+from __future__ import annotations
+from pathlib import Path
+import json
+import logging
+from typing import Optional, List, Any
+
+from workout.model import Interval, Workout
+from workout.parser import parse_zwo_file
+from workout.scheduler import WorkoutScheduler
+
+logger = logging.getLogger(__name__)
+
+
+def _optional_float(value: Optional[float]) -> Optional[float]:
+    if value is None:
+        return None
+    return float(value)
+
+
+class AppController:
+    def __init__(self, music_player: Optional[Any] = None):
+        """
+        music_player: the UI's MusicPlayer instance (optional).
+                      Controller will attempt to discover a music provider on it
+                      to call precompute_recommendations(workout, repository=...).
+        """
+        self.music_player = music_player
+
+    def load_and_prepare_workout(self, path: Path) -> WorkoutScheduler:
+        """
+        Load a workout file and create a WorkoutScheduler.
+        Also triggers music provider precomputation if a provider can be discovered.
+        Raises exceptions on invalid files (propagated to caller).
+        """
+        workout = self._load_workout_file(path)
+        scheduler = WorkoutScheduler(workout)
+        # notify provider to precompute recommendations if present
+        self._notify_provider_precompute(workout)
+        return scheduler
+
+    def _load_workout_file(self, path: Path) -> Workout:
+        suffix = path.suffix.lower()
+        if suffix == ".zwo":
+            parsed = parse_zwo_file(path)
+        elif suffix == ".json":
+            with path.open("r", encoding="utf-8") as file:
+                parsed = json.load(file)
+        else:
+            raise ValueError("Unsupported workout format. Please select a .json or .zwo file.")
+
+        if isinstance(parsed, list):
+            if not parsed:
+                raise ValueError("Selected workout file contains no workouts.")
+            parsed = parsed[0]
+
+        if not isinstance(parsed, dict):
+            raise ValueError("Workout file does not contain valid workout data.")
+
+        try:
+            return Workout.from_parsed(parsed)
+        except ValueError:
+            return self._build_workout_from_parsed_node(parsed)
+
+    def _build_workout_from_parsed_node(self, parsed: dict) -> Workout:
+        if not isinstance(parsed, dict):
+            raise ValueError("Workout file does not contain valid workout data.")
+
+        intervals = self._extract_intervals_from_node(parsed)
+        if not intervals:
+            raise ValueError(
+                "Workout file does not contain interval data. "
+                f"Parsed keys: {list(parsed.keys())}"
+            )
+
+        return Workout(
+            name=parsed.get("name") or parsed.get("Name"),
+            author=parsed.get("author") or parsed.get("Author"),
+            sport_type=parsed.get("sport_type") or parsed.get("SportType"),
+            tags=list(parsed.get("tags", [])),
+            description=parsed.get("description") or parsed.get("Description"),
+            intervals=intervals,
+        )
+
+    def _extract_intervals_from_node(self, node: dict) -> List[Interval]:
+        if not isinstance(node, dict):
+            return []
+
+        if node.get("children"):
+            intervals = []
+            for child in node.get("children", []):
+                intervals.extend(self._extract_intervals_from_node(child))
+            return intervals
+
+        if node.get("type") == "IntervalsT":
+            return self._intervals_from_intervals_t(node.get("attrs", {}) or {})
+
+        interval_info = node.get("interval") or {}
+        duration = interval_info.get("duration")
+        if duration is None:
+            return []
+
+        return [
+            Interval(
+                duration=float(duration),
+                power=_optional_float(interval_info.get("power")),
+                cadence=_optional_float(interval_info.get("cadence")),
+                type=node.get("type"),
+                attrs=dict(node.get("attrs", {}) or {}),
+            )
+        ]
+
+    def _intervals_from_intervals_t(self, attrs: dict) -> List[Interval]:
+        repeat = int(attrs.get("Repeat") or 1)
+        on_duration = attrs.get("OnDuration")
+        off_duration = attrs.get("OffDuration")
+        on_power = _optional_float(attrs.get("OnPower"))
+        off_power = _optional_float(attrs.get("OffPower"))
+        cadence = _optional_float(attrs.get("Cadence"))
+
+        intervals: List[Interval] = []
+        for _ in range(repeat):
+            if on_duration is not None:
+                intervals.append(
+                    Interval(
+                        duration=float(on_duration),
+                        power=on_power,
+                        cadence=cadence,
+                        type="IntervalsT",
+                        attrs=dict(attrs),
+                    )
+                )
+            if off_duration is not None:
+                intervals.append(
+                    Interval(
+                        duration=float(off_duration),
+                        power=off_power,
+                        cadence=cadence,
+                        type="IntervalsT",
+                        attrs=dict(attrs),
+                    )
+                )
+        return intervals
+
+    def _notify_provider_precompute(self, workout: Workout) -> None:
+        """
+        If a music provider can be discovered on the music_player, call its
+        precompute_recommendations(workout, repository=...) method.
+        This is defensive and non-fatal; any exceptions are logged.
+        """
+        try:
+            if self.music_player is None:
+                return
+            provider = self.music_player.get_provider()
+            precompute = getattr(provider, "precompute_recommendations", None)
+            if not callable(precompute):
+                return
+            repo = getattr(provider, "song_repository", None)
+            print(repo)
+            precompute(workout, repository=repo)
+        except Exception:
+            logger.exception("Failed to ask music provider to precompute recommendations")

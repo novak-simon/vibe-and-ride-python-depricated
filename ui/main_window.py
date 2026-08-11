@@ -26,6 +26,9 @@ from .formatting import format_seconds
 from music.player import MusicPlayer
 from database.workouts import upload_parsed_file
 
+# New: use AppController for logic separation
+from app.controller import AppController
+
 logger = logging.getLogger(__name__)
 
 def _optional_float(value: Optional[float]) -> Optional[float]:
@@ -39,15 +42,14 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Zwift Music")
         self.scheduler: Optional[WorkoutScheduler] = None
-        self._music_player = MusicPlayer(self._sample_song_dir())
+        self._music_player = MusicPlayer()
+        # controller mediates logic (file parsing, scheduler creation, provider precompute)
+        self._controller = AppController(music_player=self._music_player)
         self._build_ui()
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._refresh_state)
         self._timer.start(200)
-
-    def _sample_song_dir(self) -> Path:
-        return Path(__file__).resolve().parents[1] / "assets" / "sample_songs"
 
     def _build_ui(self) -> None:
         central = QWidget(self)
@@ -125,8 +127,10 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            workout = self._load_workout_file(Path(path))
-            self.scheduler = WorkoutScheduler(workout)
+            # delegate parsing/creation to controller
+            scheduler = self._controller.load_and_prepare_workout(Path(path))
+            self.scheduler = scheduler
+            workout = scheduler.workout
             self._workout_name_label.setText(f"Workout: {workout.name or 'Unnamed'}")
             self._interval_count_label.setText(f"{len(workout.intervals)} intervals")
             self._refresh_state()
@@ -134,114 +138,12 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.critical(self, "Workout load failed", str(exc))
 
-    def _load_workout_file(self, path: Path) -> Workout:
-        suffix = path.suffix.lower()
-        if suffix == ".zwo":
-            parsed = parse_zwo_file(path)
-        elif suffix == ".json":
-            with path.open("r", encoding="utf-8") as file:
-                parsed = json.load(file)
-        else:
-            raise ValueError("Unsupported workout format. Please select a .json or .zwo file.")
-
-        if isinstance(parsed, list):
-            if not parsed:
-                raise ValueError("Selected workout file contains no workouts.")
-            parsed = parsed[0]
-
-        if not isinstance(parsed, dict):
-            raise ValueError("Workout file does not contain valid workout data.")
-
-        try:
-            return Workout.from_parsed(parsed)
-        except ValueError:
-            return self._build_workout_from_parsed_node(parsed)
-
-    def _build_workout_from_parsed_node(self, parsed: dict) -> Workout:
-        if not isinstance(parsed, dict):
-            raise ValueError("Workout file does not contain valid workout data.")
-
-        intervals = self._extract_intervals_from_node(parsed)
-        if not intervals:
-            raise ValueError(
-                "Workout file does not contain interval data. "
-                f"Parsed keys: {list(parsed.keys())}"
-            )
-
-        return Workout(
-            name=parsed.get("name") or parsed.get("Name"),
-            author=parsed.get("author") or parsed.get("Author"),
-            sport_type=parsed.get("sport_type") or parsed.get("SportType"),
-            tags=list(parsed.get("tags", [])),
-            description=parsed.get("description") or parsed.get("Description"),
-            intervals=intervals,
-        )
-
-    def _extract_intervals_from_node(self, node: dict) -> list[Interval]:
-        if not isinstance(node, dict):
-            return []
-
-        if node.get("children"):
-            intervals = []
-            for child in node.get("children", []):
-                intervals.extend(self._extract_intervals_from_node(child))
-            return intervals
-
-        if node.get("type") == "IntervalsT":
-            return self._intervals_from_intervals_t(node.get("attrs", {}) or {})
-
-        interval_info = node.get("interval") or {}
-        duration = interval_info.get("duration")
-        if duration is None:
-            return []
-
-        return [
-            Interval(
-                duration=float(duration),
-                power=_optional_float(interval_info.get("power")),
-                cadence=_optional_float(interval_info.get("cadence")),
-                type=node.get("type"),
-                attrs=dict(node.get("attrs", {}) or {}),
-            )
-        ]
-
-    def _intervals_from_intervals_t(self, attrs: dict) -> list[Interval]:
-        repeat = int(attrs.get("Repeat") or 1)
-        on_duration = attrs.get("OnDuration")
-        off_duration = attrs.get("OffDuration")
-        on_power = _optional_float(attrs.get("OnPower"))
-        off_power = _optional_float(attrs.get("OffPower"))
-        cadence = _optional_float(attrs.get("Cadence"))
-
-        intervals = []
-        for _ in range(repeat):
-            if on_duration is not None:
-                intervals.append(
-                    Interval(
-                        duration=float(on_duration),
-                        power=on_power,
-                        cadence=cadence,
-                        type="IntervalsT",
-                        attrs=dict(attrs),
-                    )
-                )
-            if off_duration is not None:
-                intervals.append(
-                    Interval(
-                        duration=float(off_duration),
-                        power=off_power,
-                        cadence=cadence,
-                        type="IntervalsT",
-                        attrs=dict(attrs),
-                    )
-                )
-        return intervals
-
     def _start_workout(self) -> None:
         if self.scheduler is None:
             QMessageBox.warning(self, "No workout", "Please load a workout before starting.")
             return
 
+        # keep UI responsibilities only; start scheduling via scheduler object
         self.scheduler.start()
         self._timer.start(200)
         self._refresh_state()

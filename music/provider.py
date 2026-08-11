@@ -14,11 +14,11 @@ RECOMMENDER_LIMIT_PER_INTERVAL = 10
 
 
 class SongProvider:
-    def __init__(self, song_directory: Path, client=None) -> None:
-        self._song_directory = song_directory
+    def __init__(self, client=None) -> None:
         self._client = client or supabase
         self._songs: List[Song] = []
         self._current_index = -1
+        self._interval_recs = {}  # type: dict[int, list]
         self._load_songs()
 
     def _load_songs(self) -> None:
@@ -26,30 +26,10 @@ class SongProvider:
             songs = get_playable_songs(client=self._client)
         except Exception:
             songs = []
-
-        if not songs:
-            songs = self._load_local_songs()
+            print("Unable to get songs from the database")
 
         self._songs = songs
         self._current_index = 0 if self._songs else -1
-
-    def _load_local_songs(self) -> List[Song]:
-        if not self._song_directory.exists() or not self._song_directory.is_dir():
-            return []
-
-        songs: List[Song] = []
-        for path in sorted(self._song_directory.iterdir()):
-            if path.suffix.lower() not in AUDIO_EXTENSIONS:
-                continue
-
-            songs.append(
-                Song(
-                    title=path.stem,
-                    jamendo_id=f"local-{path.name}",
-                    audio_url=str(path),
-                )
-            )
-        return songs
 
     def has_songs(self) -> bool:
         return bool(self._songs)
@@ -67,13 +47,6 @@ class SongProvider:
 
     def songs(self) -> List[Song]:
         return list(self._songs)
-
-
-class MusicProvider(SongProvider):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # cache for precomputed recommendations per-workout
-        self._interval_recs = {}  # type: dict[int, list]
 
     def fetch_candidate_songs(self, repository: Optional[Any] = None) -> list:
         """

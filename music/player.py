@@ -6,7 +6,7 @@ from typing import Optional
 
 try:
     from PySide6.QtCore import QUrl
-    from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+    from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
     _PYSIDE6_MULTIMEDIA_ERROR = None
 except ImportError as exc:
     QUrl = QAudioOutput = QMediaPlayer = None
@@ -21,10 +21,10 @@ MUSIC_ENABLED = True
 
 
 class MusicPlayer:
-    def __init__(self, song_directory: Path, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         self._player = None
         self._audio_output = None
-        self._provider = SongProvider(song_directory)
+        self._provider = SongProvider()
         self._songs = self._provider.songs()
         self._current_index = self._provider._current_index
         self._debug_info = ""
@@ -43,13 +43,29 @@ class MusicPlayer:
             )
             return
 
-        self._player = QMediaPlayer()
-        self._audio_output = QAudioOutput()
-        if hasattr(self._audio_output, "setVolume"):
-            self._audio_output.setVolume(1.0)
-        if hasattr(self._audio_output, "setMuted"):
-            self._audio_output.setMuted(False)
-        self._player.setAudioOutput(self._audio_output)
+        self._player = getattr(self, "_player", None) or QMediaPlayer()
+        self._audio_output = getattr(self, "_audio_output", None) or QAudioOutput()
+        # default to 80% volume; adjust if you prefer quieter/louder
+        try:
+            self._audio_output.setVolume(0.8)
+        except Exception:
+            # older Qt bindings may expect volume in a different range; ignore if unsupported
+            pass
+        # attach audio output to player
+        try:
+            self._player.setAudioOutput(self._audio_output)
+        except Exception:
+            # some environments may already have audio routing set; continue
+            pass
+
+        # optional: log player errors
+        try:
+            self._player.errorOccurred.connect(
+                lambda err, msg=None: logger.error("QMediaPlayer error: %s %s", err, msg)
+            )
+        except Exception:
+            # signal may not be present in some bindings; ignore
+            pass
 
         if self._provider.has_songs():
             self._set_current_source()
@@ -88,6 +104,9 @@ class MusicPlayer:
             f"backend OK, songs={len(self._songs)}, "
             f"current_index={self._current_index}"
         )
+
+    def get_provider(self) -> SongProvider:
+        return self._provider
 
     def _set_current_source(self) -> None:
         song = self._provider.get_current_song()
@@ -142,3 +161,33 @@ class MusicPlayer:
 
     def _on_error(self, error, error_string) -> None:
         logger.error("Media player error: %s %s", error, error_string)
+
+    # ensure playback uses setSource with a QUrl and audio output is unmuted
+    def play_path(self, path: str) -> None:
+        if not path or not isinstance(path, str):
+            return
+        if not path.startswith(("http://", "https://", "file://")):
+            path = "file://" + path
+        try:
+            url = QUrl.fromLocalFile(str(path))
+            # attach source and play
+            try:
+                self._player.setSource(url)
+            except Exception:
+                # older API compatibility
+                try:
+                    from PySide6.QtMultimedia import QMediaContent
+                    self._player.setSource(QMediaContent(url))
+                except Exception:
+                    pass
+            # ensure volume is non-zero and unmuted
+            try:
+                if self._audio_output is not None:
+                    # set a sensible default if volume was 0
+                    if self._audio_output.volume() == 0:
+                        self._audio_output.setVolume(0.8)
+            except Exception:
+                pass
+            self._player.play()
+        except Exception:
+            logger.exception("Failed to play path: %s", path)
