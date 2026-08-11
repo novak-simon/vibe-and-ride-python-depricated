@@ -14,6 +14,7 @@ except ImportError as exc:
 
 from music.model import Song
 from music.provider import SongProvider
+from workout.scheduler import WorkoutScheduler
 
 logger = logging.getLogger(__name__)
 
@@ -21,12 +22,11 @@ MUSIC_ENABLED = True
 
 
 class MusicPlayer:
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, scheduler: WorkoutScheduler, *args, **kwargs) -> None:
         self._player = None
         self._audio_output = None
-        self._provider = SongProvider()
-        self._songs = self._provider.songs()
-        self._current_index = self._provider._current_index
+        self._provider = SongProvider(scheduler=scheduler)
+        self._songs = self._provider._songs
         self._debug_info = ""
         self._backend_error = _PYSIDE6_MULTIMEDIA_ERROR
         self._backend_available = (
@@ -101,8 +101,7 @@ class MusicPlayer:
         if not self._backend_available:
             return "backend unavailable"
         return (
-            f"backend OK, songs={len(self._songs)}, "
-            f"current_index={self._current_index}"
+            f"backend OK, songs={len(self._songs)}"
         )
 
     def get_provider(self) -> SongProvider:
@@ -148,10 +147,8 @@ class MusicPlayer:
     def next_track(self) -> None:
         if not self.available or self._player is None or not self._provider.has_songs():
             return
-        self._provider.next_song()
-        self._songs = self._provider.songs()
-        self._current_index = self._provider._current_index
-        self._set_current_source()
+        next_song = self._provider.next_song()
+        self._set_current_source(next_song)
         self._player.play()
 
     def _on_media_status_changed(self, status) -> None:
@@ -161,33 +158,3 @@ class MusicPlayer:
 
     def _on_error(self, error, error_string) -> None:
         logger.error("Media player error: %s %s", error, error_string)
-
-    # ensure playback uses setSource with a QUrl and audio output is unmuted
-    def play_path(self, path: str) -> None:
-        if not path or not isinstance(path, str):
-            return
-        if not path.startswith(("http://", "https://", "file://")):
-            path = "file://" + path
-        try:
-            url = QUrl.fromLocalFile(str(path))
-            # attach source and play
-            try:
-                self._player.setSource(url)
-            except Exception:
-                # older API compatibility
-                try:
-                    from PySide6.QtMultimedia import QMediaContent
-                    self._player.setSource(QMediaContent(url))
-                except Exception:
-                    pass
-            # ensure volume is non-zero and unmuted
-            try:
-                if self._audio_output is not None:
-                    # set a sensible default if volume was 0
-                    if self._audio_output.volume() == 0:
-                        self._audio_output.setVolume(0.8)
-            except Exception:
-                pass
-            self._player.play()
-        except Exception:
-            logger.exception("Failed to play path: %s", path)

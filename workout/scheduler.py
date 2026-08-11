@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Optional, Any
 import logging
 logger = logging.getLogger(__name__)
 
@@ -35,16 +35,14 @@ class WorkoutState:
 
 
 class WorkoutScheduler:
-    def __init__(self, workout: Workout, time_fn: Optional[Callable[[], float]] = None):
-        if workout is None:
-            raise ValueError("Workout cannot be None")
-        self.workout = workout
+    def __init__(self, controller: Any, time_fn: Optional[Callable[[], float]] = None):
+        self.controller = controller
+        self.workout = None
         self._time_fn = time_fn or time.monotonic
         self._status = WorkoutStatus.NOT_STARTED
         self._start_monotonic: Optional[float] = None
         self._elapsed_before_start = 0.0
         self._last_interval_index = _UNSET_LAST_INTERVAL
-        self._notify_provider_workout_chosen(self.workout)
 
     @property
     def status(self) -> str:
@@ -61,6 +59,14 @@ class WorkoutScheduler:
     @property
     def is_finished(self) -> bool:
         return self._status == WorkoutStatus.FINISHED
+
+    def initialize(self, workout: Workout):
+        if workout is None:
+            raise ValueError("Workout cannot be None")
+        self.workout = workout
+        self._notify_provider_workout_chosen(self.workout)
+        return
+
 
     def start(self) -> None:
         if self.is_running:
@@ -145,7 +151,7 @@ class WorkoutScheduler:
             elapsed_in_interval=elapsed_in_interval,
             remaining_in_interval=remaining_in_interval,
             total_elapsed=total_elapsed,
-            total_remaining=max(0.0, self.workout.total_duration - total_elapsed),
+            total_remaining=max(0.0, self.workout.total_duration - total_elapsed) if not self.workout is None else 0.0,
             interval_changed=interval_changed,
         )
 
@@ -161,15 +167,19 @@ class WorkoutScheduler:
                 self._elapsed_before_start + (self._time_fn() - self._start_monotonic),
                 self.workout.total_duration,
             )
-        return min(self._elapsed_before_start, self.workout.total_duration)
+        elif not self.workout is None:
+            return min(self._elapsed_before_start, self.workout.total_duration)
+        else:
+            return self._elapsed_before_start
 
     def _find_interval(self, workout_time: float):
         elapsed = 0.0
-        for index, interval in enumerate(self.workout.intervals):
-            if workout_time < elapsed + interval.duration:
-                return index, interval, elapsed
-            elapsed += interval.duration
-        return None, None, elapsed
+        if not self.workout is None:
+            for index, interval in enumerate(self.workout.intervals):
+                if workout_time < elapsed + interval.duration:
+                    return index, interval, elapsed
+                elapsed += interval.duration
+        return 0, None, elapsed
 
     # Attempt to notify music provider to start precomputing whenever a workout is chosen.
     # This integration is intentionally small and defensive: it only calls provider if the scheduler

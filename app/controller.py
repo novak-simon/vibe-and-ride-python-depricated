@@ -15,6 +15,7 @@ from typing import Optional, List, Any
 from workout.model import Interval, Workout
 from workout.parser import parse_zwo_file
 from workout.scheduler import WorkoutScheduler
+from music.player import MusicPlayer
 
 logger = logging.getLogger(__name__)
 
@@ -26,25 +27,22 @@ def _optional_float(value: Optional[float]) -> Optional[float]:
 
 
 class AppController:
-    def __init__(self, music_player: Optional[Any] = None):
-        """
-        music_player: the UI's MusicPlayer instance (optional).
-                      Controller will attempt to discover a music provider on it
-                      to call precompute_recommendations(workout, repository=...).
-        """
-        self.music_player = music_player
+    def __init__(self):
+        self.scheduler = WorkoutScheduler(self)
+        self.music_player = MusicPlayer(self.scheduler)
+        self.music_provider = self.music_player.get_provider()
 
-    def load_and_prepare_workout(self, path: Path) -> WorkoutScheduler:
+    def load_and_prepare_workout(self, path: Path) -> None:
         """
         Load a workout file and create a WorkoutScheduler.
         Also triggers music provider precomputation if a provider can be discovered.
         Raises exceptions on invalid files (propagated to caller).
         """
         workout = self._load_workout_file(path)
-        scheduler = WorkoutScheduler(workout)
-        # notify provider to precompute recommendations if present
-        self._notify_provider_precompute(workout)
-        return scheduler
+        self.scheduler.initialize(workout)
+        # notify provider to precompute recommendations
+        self.music_provider.precompute_recommendations(workout)
+        return
 
     def _load_workout_file(self, path: Path) -> Workout:
         suffix = path.suffix.lower()
@@ -148,22 +146,3 @@ class AppController:
                     )
                 )
         return intervals
-
-    def _notify_provider_precompute(self, workout: Workout) -> None:
-        """
-        If a music provider can be discovered on the music_player, call its
-        precompute_recommendations(workout, repository=...) method.
-        This is defensive and non-fatal; any exceptions are logged.
-        """
-        try:
-            if self.music_player is None:
-                return
-            provider = self.music_player.get_provider()
-            precompute = getattr(provider, "precompute_recommendations", None)
-            if not callable(precompute):
-                return
-            repo = getattr(provider, "song_repository", None)
-            print(repo)
-            precompute(workout, repository=repo)
-        except Exception:
-            logger.exception("Failed to ask music provider to precompute recommendations")

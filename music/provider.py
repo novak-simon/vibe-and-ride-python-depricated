@@ -3,10 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable, Optional, List, Any
 
+from workout.scheduler import WorkoutScheduler
 from database.client import supabase
 from database.songs import get_playable_songs
 from music.model import Song
-from recommendation.recommender import recommend  # new dependency
+from recommendation.recommender import recommend, Recommendation  # new dependency
 
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".ogg", ".flac", ".m4a"}
 RECOMMENDER_CANDIDATE_POOL = 50
@@ -14,11 +15,12 @@ RECOMMENDER_LIMIT_PER_INTERVAL = 10
 
 
 class SongProvider:
-    def __init__(self, client=None) -> None:
+    def __init__(self, scheduler=WorkoutScheduler, client=None) -> None:
         self._client = client or supabase
         self._songs: List[Song] = []
         self._current_index = -1
         self._interval_recs = {}  # type: dict[int, list]
+        self.scheduler: WorkoutScheduler = scheduler
         self._load_songs()
 
     def _load_songs(self) -> None:
@@ -27,26 +29,20 @@ class SongProvider:
         except Exception:
             songs = []
             print("Unable to get songs from the database")
-
         self._songs = songs
-        self._current_index = 0 if self._songs else -1
 
     def has_songs(self) -> bool:
         return bool(self._songs)
 
     def get_current_song(self) -> Optional[Song]:
-        if self._current_index < 0 or self._current_index >= len(self._songs):
-            return None
-        return self._songs[self._current_index]
+        interval_index = self.scheduler.current_interval_index()
+        return self.choose_song_for_interval(interval_index)
 
     def next_song(self) -> Optional[Song]:
-        if not self._songs:
-            return None
-        self._current_index = (self._current_index + 1) % len(self._songs)
-        return self.get_current_song()
-
-    def songs(self) -> List[Song]:
-        return list(self._songs)
+        self._current_index += 1
+        interval = self.scheduler.current_interval()
+        song = self.choose_song_for_interval(interval)
+        return song
 
     def fetch_candidate_songs(self, repository: Optional[Any] = None) -> list:
         """
@@ -98,27 +94,18 @@ class SongProvider:
         Return precomputed recommendations for an interval index.
         If not precomputed, compute on-demand using fallback_repository or internal pool.
         """
-        if interval_index in self._interval_recs:
+        if not self._interval_recs.get(interval_index) is None:
             recs = self._interval_recs[interval_index]
             return recs[:limit] if limit is not None else recs
-        # on-demand compute
-        try:
-            # attempt to find workout intervals context to build interval object - conservative approach:
-            candidates = self.fetch_candidate_songs(repository=fallback_repository)
-            # We don't have the interval instance here; caller should pass it if on-demand is required.
-            return []
-        except Exception:
-            return []
+        return []
 
-    def choose_song_for_interval(self, interval_index: int, interval_obj: Any, repository: Optional[Any] = None) -> Optional[Any]:
+    def choose_song_for_interval(self, interval_index: int) -> Optional[Any]:
         """
         Return the top recommended song for an interval.
         Tries precomputed recommendations first; if none, computes recommendations on-demand.
         """
         recs = self.get_recommendations_for_interval(interval_index)
         if recs:
-            return recs[0].song
-        # compute on-demand
-        candidates = self.fetch_candidate_songs(repository=repository)
-        recs = recommend(interval_obj, candidates, limit=1)
-        return recs[0].song if recs else None
+            return recs[self._current_index].song
+        else:
+            return self._songs[interval_index * 5 + self._current_index]

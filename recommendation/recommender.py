@@ -16,7 +16,12 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any, List, Optional, Sequence
 import logging
+import ast
 
+
+logging.basicConfig(
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
 # === Configuration ===
@@ -58,13 +63,18 @@ def _get(obj: Any, key: str, default=None):
         return obj.get(key, default)
     return getattr(obj, key, default)
 
+def _genre_to_list(genre):
+    if genre is None:
+        return []
+    return ast.literal_eval(genre)
+
 
 # === Cadence resolution ===
 def estimate_cadence_from_power(power: float, interval_context: Optional[Any] = None) -> Optional[float]:
     """
     Simple documented approximation mapping power -> cadence (fallback).
     Formula (first minimal implementation):
-      cadence = 80 + (power - 200) / 10
+      max(75, min(115, 70 + 30 * p))
     Clamped to [50, 110] RPM.
 
     Rationale: 80 RPM is a reasonable mid-point for many structured workouts.
@@ -74,8 +84,7 @@ def estimate_cadence_from_power(power: float, interval_context: Optional[Any] = 
         p = float(power)
     except Exception:
         return None
-    cadence = 80.0 + (p - 200.0) / 10.0
-    cadence = max(50.0, min(110.0, cadence))
+    cadence = max(75, min(115, 70 + 30 * p))
     logger.debug("estimate_cadence_from_power: power=%s -> cadence=%.2f", power, cadence)
     return cadence
 
@@ -109,12 +118,15 @@ def song_matches_user_genres(song: Any, user_genres: Sequence[str] = USER_GENRES
       - song.genres as list/sequence
     """
     g = _get(song, "genre", None)
+    g = _genre_to_list(g)
     if g is None:
         g = _get(song, "genres", None)
     if g is None:
         return False
     if isinstance(g, str):
-        return g.lower() in {ug.lower() for ug in user_genres}
+        if g.lower() in {ug.lower() for ug in user_genres}:
+            return True
+        return False
     try:
         for gg in g:
             if isinstance(gg, str) and gg.lower() in {ug.lower() for ug in user_genres}:
@@ -174,6 +186,7 @@ def recommend(interval: Any, songs: Sequence[Any], limit: int = 10, user_genres:
 
     # Genre filter
     genre_candidates = [s for s in songs if song_matches_user_genres(s, user_genres)]
+    print(f"Candidates by genre: {len(genre_candidates)}")
     logger.debug("Genre candidates: %d / %d", len(genre_candidates), len(songs))
     if not genre_candidates:
         logger.info("No songs matched user genres: %s", user_genres)
