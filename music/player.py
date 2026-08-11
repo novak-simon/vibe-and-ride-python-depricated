@@ -145,11 +145,10 @@ class MusicPlayer:
         if self._player is not None:
             self._player.stop()
 
-    def next_track(self) -> None:
+    def next_track(self, interval_changed: bool = False) -> None:
         if not self.available or self._player is None or not self._provider.has_songs():
             return
-        next_song = self._provider.next_song()
-        print(next_song)
+        next_song = self._provider.next_song(interval_changed)
         self._set_current_source(next_song)
         self._player.play()
 

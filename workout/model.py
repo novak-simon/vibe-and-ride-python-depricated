@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
+from recommendation.recommender import estimate_cadence_from_power
 
 ZwoValue = Union[str, int, float, bool, None]
 ZwoNode = Dict[str, Any]
@@ -47,27 +48,10 @@ class Workout:
     def from_parsed(cls, parsed: ZwoNode) -> "Workout":
         if not isinstance(parsed, dict):
             raise ValueError("Parsed workout data must be a dict")
-
-        if parsed.get("type") is None:
-            intervals = _intervals_from_list(parsed.get("intervals", [])) if isinstance(parsed.get("intervals"), list) else _extract_wod_intervals(parsed)
-            if not intervals:
-                raise ValueError("Parsed workout data contains no intervals")
-            return cls(
-                name=parsed.get("name"),
-                author=parsed.get("author"),
-                sport_type=parsed.get("sport_type") or parsed.get("sportType"),
-                tags=list(parsed.get("tags", [])),
-                description=parsed.get("description"),
-                intervals=intervals,
-            )
-
-        if parsed.get("type") != "Workout":
-            raise ValueError("Parsed data must represent a Workout node")
-
         return cls(
             name=parsed.get("name"),
             author=parsed.get("author"),
-            sport_type=parsed.get("sport_type"),
+            sport_type=parsed.get("sport_type_is_bike"),
             tags=list(parsed.get("tags", [])),
             description=parsed.get("description"),
             intervals=_extract_wod_intervals(parsed),
@@ -77,16 +61,17 @@ class Workout:
 def _intervals_from_list(intervals_data: List[ZwoNode]) -> List[Interval]:
     output: List[Interval] = []
     for item in intervals_data:
-        if not isinstance(item, dict):
-            continue
-        duration = item.get("duration")
+        data = item.get("interval")
+        duration = data.get("duration")
         if duration is None:
             continue
+        power = _optional_float(data.get("power"))
+        cadence = _optional_float(data.get("cadence"))
         output.append(
             Interval(
                 duration=float(duration),
-                power=_optional_float(item.get("power")),
-                cadence=_optional_float(item.get("cadence")),
+                power=power,
+                cadence=cadence if not cadence is None else estimate_cadence_from_power(power),
                 type=item.get("type"),
                 attrs=dict(item.get("attrs", {})),
             )
@@ -115,6 +100,10 @@ def _repeat_count(value: Any) -> int:
 def _extract_wod_intervals(node: ZwoNode) -> List[Interval]:
     if not isinstance(node, dict):
         return []
+
+    intervals_data = node.get("intervals")
+    if isinstance(intervals_data, list):
+        return _intervals_from_list(intervals_data)
 
     attrs = node.get("attrs", {}) or {}
     repeat = _repeat_count(attrs.get("Repeat"))
@@ -153,7 +142,7 @@ def _intervals_from_intervals_t(attrs: Dict[str, ZwoValue]) -> List[Interval]:
                 Interval(
                     duration=float(on_duration),
                     power=on_power,
-                    cadence=cadence,
+                    cadence=cadence if not cadence is None else estimate_cadence_from_power(on_power),
                     type="IntervalsT",
                     attrs=dict(attrs),
                 )
@@ -163,7 +152,7 @@ def _intervals_from_intervals_t(attrs: Dict[str, ZwoValue]) -> List[Interval]:
                 Interval(
                     duration=float(off_duration),
                     power=off_power,
-                    cadence=cadence,
+                    cadence=cadence if not cadence is None else estimate_cadence_from_power(on_power),
                     type="IntervalsT",
                     attrs=dict(attrs),
                 )

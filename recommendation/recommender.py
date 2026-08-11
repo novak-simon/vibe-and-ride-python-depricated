@@ -19,9 +19,7 @@ import logging
 import ast
 
 
-logging.basicConfig(
-    level=logging.INFO
-)
+
 logger = logging.getLogger(__name__)
 
 # === Configuration ===
@@ -75,7 +73,7 @@ def estimate_cadence_from_power(power: float, interval_context: Optional[Any] = 
     Simple documented approximation mapping power -> cadence (fallback).
     Formula (first minimal implementation):
       max(75, min(115, 70 + 30 * p))
-    Clamped to [50, 110] RPM.
+    Clamped to [75, 115] RPM.
 
     Rationale: 80 RPM is a reasonable mid-point for many structured workouts.
     This is only a heuristic fallback for intervals that specify power but not cadence.

@@ -10,7 +10,7 @@ from music.model import Song
 from recommendation.recommender import recommend, Recommendation  # new dependency
 
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".ogg", ".flac", ".m4a"}
-RECOMMENDER_CANDIDATE_POOL = 50
+RECOMMENDER_CANDIDATE_POOL = 100
 RECOMMENDER_LIMIT_PER_INTERVAL = 10
 
 
@@ -38,8 +38,11 @@ class SongProvider:
         interval_index = self.scheduler.current_interval_index()
         return self.choose_song_for_interval(interval_index)
 
-    def next_song(self) -> Optional[Song]:
-        self._current_index += 1
+    def next_song(self, interval_changed: bool = False) -> Optional[Song]:
+        if interval_changed:
+            self._current_index = 0
+        else:
+            self._current_index += 1
         interval_index = self.scheduler.current_interval_index()
         song = self.choose_song_for_interval(interval_index)
         return song
@@ -106,6 +109,9 @@ class SongProvider:
         """
         recs = self.get_recommendations_for_interval(interval_index)
         if recs:
+            print(f"Song index: {self._current_index}")
+            song = recs[self._current_index].song
+            print(f"Song: {song.title}, BPM: {song.bpm}, Genre: {song.genre}")
             return recs[self._current_index].song
         else:
             return self._songs[interval_index * 5 + self._current_index]

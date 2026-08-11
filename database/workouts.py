@@ -48,7 +48,8 @@ def upload_parsed_file(parsedFile: Union["ZwoNode", List["ZwoNode"]], client: An
             "name": item.get("children")[1].get("text"),
             "author": item.get("children")[0].get("text"),
             "sport_type_is_bike": _is_bike_sport(item.get("children")[3].get("text")),
-            "parsed_workout": item,
+            "description": item.get("children")[2].get("text"),
+            "intervals": item.get("children")[5].get("children"),
         }
 
         if name_exists(record.get("name"), client=client):
@@ -73,7 +74,7 @@ def list_workouts(client: Any | None = None) -> List[dict[str, Any]]:
     Return list of workout rows from the 'workouts' table.
     """
     client = _effective_client(client)
-    response = client.table("workouts").select("*").order("id", desc=False).execute()
+    response = client.table("workouts").select("*").order("name", desc=False).execute()
     rows = _extract_data(response)
     return rows or []
 

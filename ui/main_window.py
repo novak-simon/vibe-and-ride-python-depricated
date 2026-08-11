@@ -272,7 +272,7 @@ class MainWindow(QMainWindow):
 
         if state.status == WorkoutStatus.RUNNING:
             if state.interval_changed:
-                self._music_player.next_track()
+                self._music_player.next_track(True)
             self._music_player.play()
         elif state.status == WorkoutStatus.PAUSED or state.status == WorkoutStatus.NOT_STARTED:
             self._music_player.pause()

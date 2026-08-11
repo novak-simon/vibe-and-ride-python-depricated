@@ -81,34 +81,33 @@ class AppController:
         else:
             raise ValueError("Invalid workout identifier")
 
-        parsed = row.get("parsed_workout") or row.get("parsedWorkout") or row.get("parsed")
-        if parsed is None:
-            # Attempt to build workout from stored flat columns if parsed blob missing.
-            # Build a minimal dict for _build_workout_from_parsed_node
-            parsed = {
-                "name": row.get("name"),
-                "author": row.get("author"),
-                "sport_type": row.get("sport_type") or row.get("sport_type_is_bike"),
-                "tags": row.get("tags") or [],
-                "description": row.get("description"),
-                # If intervals are stored separately in the row use that; else leave for fallback.
-                "intervals": row.get("intervals"),
-            }
+        intervals = row.get("intervals")
+        if isinstance(intervals, str):
+            try:
+                intervals = json.loads(intervals)
+            except json.JSONDecodeError:
+                pass
+        parsed = {
+            "name": row.get("name"),
+            "author": row.get("author"),
+            "sport_type": row.get("sport_type") or row.get("sport_type_is_bike"),
+            "tags": row.get("tags") or [],
+            "description": row.get("description"),
+            "intervals": intervals,
+        }
 
-        # parsed may already be a Workout-like dict or a parsed node.
         if isinstance(parsed, list):
             if not parsed:
                 raise ValueError("Stored workout contains no workouts.")
             parsed = parsed[0]
 
-        workout: Workout
-        if isinstance(parsed, dict):
-            try:
-                workout = Workout.from_parsed(parsed)
-            except ValueError:
-                workout = self._build_workout_from_parsed_node(parsed)
-        else:
+        if not isinstance(parsed, dict):
             raise ValueError("Stored workout does not contain valid parsed data.")
+
+        try:
+            workout = Workout.from_parsed(parsed)
+        except Exception:
+            workout = self._build_workout_from_parsed_node(parsed)
 
         self.scheduler.initialize(workout)
         if self.music_provider is not None:

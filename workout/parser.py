@@ -165,6 +165,6 @@ def parse_all_workouts(
         target_path = parsed_dir / f"{source.stem}.json"
         if target_path.exists() and not force:
             continue
-        parse_zwo_file(source, parsed_dir)
+        parse_zwo_file(source)
         parsed_paths.append(target_path)
     return parsed_paths
