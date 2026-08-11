@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 
-from workout.parser import parse_and_save_zwo_file, parse_zwo_string
+from workout.parser import parse_zwo_string, parse_zwo_file
 
 SIMPLE_ZWO = """<?xml version="1.0" encoding="UTF-8"?>
 <Workout Name="Short" Author="Me" SportType="1">
@@ -32,7 +32,7 @@ class ParserUploadTest(unittest.TestCase):
             tf_path = Path(tf.name)
 
         try:
-            out_path = parse_and_save_zwo_file(tf_path, target_dir=tf_path.parent)
+            out_path = parse_zwo_file(tf_path, target_dir=tf_path.parent)
             # file saved
             self.assertTrue(out_path.exists())
             parsed = json.loads(out_path.read_text(encoding="utf-8"))

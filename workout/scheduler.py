@@ -3,6 +3,8 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from typing import Callable, Optional
+import logging
+logger = logging.getLogger(__name__)
 
 from .model import Interval, Workout
 
@@ -42,6 +44,7 @@ class WorkoutScheduler:
         self._start_monotonic: Optional[float] = None
         self._elapsed_before_start = 0.0
         self._last_interval_index = _UNSET_LAST_INTERVAL
+        self._notify_provider_workout_chosen(self.workout)
 
     @property
     def status(self) -> str:
@@ -167,3 +170,26 @@ class WorkoutScheduler:
                 return index, interval, elapsed
             elapsed += interval.duration
         return None, None, elapsed
+
+    # Attempt to notify music provider to start precomputing whenever a workout is chosen.
+    # This integration is intentionally small and defensive: it only calls provider if the scheduler
+    # has a reference to one (common in applications where components are wired together).
+    
+
+    def _notify_provider_workout_chosen(self, workout):
+        """
+        Defensive helper: call precompute_recommendations on an attached music provider if present.
+        Should be invoked right after the scheduler selects/accepts a workout.
+        """
+        try:
+            provider = getattr(self, "music_provider", None) or getattr(self, "provider", None)
+            if provider is None:
+                return
+            # If the provider supports precompute_recommendations, call it.
+            precompute = getattr(provider, "precompute_recommendations", None)
+            if callable(precompute):
+                # Attempt to pass provider's known repository if available to avoid extra DB work.
+                repo = getattr(provider, "song_repository", None)
+                precompute(workout, repository=repo)
+        except Exception:
+            logger.exception("Failed to notify music provider about selected workout")
