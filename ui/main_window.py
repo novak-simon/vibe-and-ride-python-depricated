@@ -117,25 +117,74 @@ class MainWindow(QMainWindow):
         self._update_controls()
 
     def _load_workout(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
+        """
+        New behaviour:
+        - Show a simple chooser with workouts from DB (default).
+        - Provide "Import my own workout..." option which falls back to file picker and existing import flow.
+        """
+        try:
+            rows = self._controller.list_available_workouts()
+        except Exception as exc:
+            logger.exception("Failed to list workouts from DB")
+            rows = []
+
+        choices = []
+        id_map = []
+        # Default top choice: import your own
+        choices.append("Import my own workout...")
+        id_map.append(None)
+
+        for row in rows:
+            name = row.get("name") or "<unnamed>"
+            author = row.get("author")
+            display = f"{name}" + (f" — {author}" if author else "")
+            choices.append(display)
+            id_map.append(row.get("id"))
+
+        # If there are no DB workouts, inform user but still allow import via that first choice.
+        item, ok = QInputDialog.getItem(
             self,
-            "Select workout file",
-            "",
-            "Workout files (*.json *.zwo);;JSON files (*.json);;Zwift workout files (*.zwo)",
+            "Select workout",
+            "Choose a workout (library is default):",
+            choices,
+            0,
+            False,
         )
-        if not path:
+        if not ok:
             return
 
-        try:
-            # delegate parsing/creation to controller
-            self._controller.load_and_prepare_workout(Path(path))
-            workout = self._scheduler.workout
-            self._workout_name_label.setText(f"Workout: {workout.name or 'Unnamed'}")
-            self._interval_count_label.setText(f"{len(workout.intervals)} intervals")
-            self._refresh_state()
-            self._update_controls()
-        except Exception as exc:
-            QMessageBox.critical(self, "Workout load failed", str(exc))
+        selected_index = choices.index(item)
+        selected_id = id_map[selected_index]
+
+        if selected_id is None:
+            # Import flow (existing)
+            path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Select workout file",
+                "",
+                "Workout files (*.json *.zwo);;JSON files (*.json);;Zwift workout files (*.zwo)",
+            )
+            if not path:
+                return
+            try:
+                # delegate parsing/creation to controller
+                self._controller.load_and_prepare_workout(Path(path))
+            except Exception as exc:
+                QMessageBox.critical(self, "Workout load failed", str(exc))
+                return
+        else:
+            # Load from DB
+            try:
+                self._controller.load_and_prepare_workout_from_db(selected_id)
+            except Exception as exc:
+                QMessageBox.critical(self, "Workout load failed", str(exc))
+                return
+
+        workout = self._scheduler.workout
+        self._workout_name_label.setText(f"Workout: {workout.name or 'Unnamed'}")
+        self._interval_count_label.setText(f"{len(workout.intervals)} intervals")
+        self._refresh_state()
+        self._update_controls()
 
     def _start_workout(self) -> None:
         if self._scheduler is None:

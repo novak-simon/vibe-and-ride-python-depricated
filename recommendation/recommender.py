@@ -83,7 +83,7 @@ def estimate_cadence_from_power(power: float, interval_context: Optional[Any] = 
     try:
         p = float(power)
     except Exception:
-        return None
+        return 80 #Default cadence value if there is literally no information
     cadence = max(75, min(115, 70 + 30 * p))
     logger.debug("estimate_cadence_from_power: power=%s -> cadence=%.2f", power, cadence)
     return cadence

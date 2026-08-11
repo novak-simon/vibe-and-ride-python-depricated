@@ -107,8 +107,9 @@ class MusicPlayer:
     def get_provider(self) -> SongProvider:
         return self._provider
 
-    def _set_current_source(self) -> None:
-        song = self._provider.get_current_song()
+    def _set_current_source(self, song: Song = None) -> None:
+        if song is None:
+            song = self._provider.get_current_song()
         if song is None or song.audio_url is None or QUrl is None:
             return
 
@@ -148,6 +149,7 @@ class MusicPlayer:
         if not self.available or self._player is None or not self._provider.has_songs():
             return
         next_song = self._provider.next_song()
+        print(next_song)
         self._set_current_source(next_song)
         self._player.play()
 

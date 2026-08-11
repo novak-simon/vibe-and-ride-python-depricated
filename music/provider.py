@@ -40,8 +40,8 @@ class SongProvider:
 
     def next_song(self) -> Optional[Song]:
         self._current_index += 1
-        interval = self.scheduler.current_interval()
-        song = self.choose_song_for_interval(interval)
+        interval_index = self.scheduler.current_interval_index()
+        song = self.choose_song_for_interval(interval_index)
         return song
 
     def fetch_candidate_songs(self, repository: Optional[Any] = None) -> list:
@@ -94,15 +94,15 @@ class SongProvider:
         Return precomputed recommendations for an interval index.
         If not precomputed, compute on-demand using fallback_repository or internal pool.
         """
-        if not self._interval_recs.get(interval_index) is None:
+        try:
             recs = self._interval_recs[interval_index]
             return recs[:limit] if limit is not None else recs
-        return []
+        except Exception:
+            return []
 
     def choose_song_for_interval(self, interval_index: int) -> Optional[Any]:
         """
         Return the top recommended song for an interval.
-        Tries precomputed recommendations first; if none, computes recommendations on-demand.
         """
         recs = self.get_recommendations_for_interval(interval_index)
         if recs:

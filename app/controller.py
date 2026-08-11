@@ -10,12 +10,17 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import logging
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Union
 
 from workout.model import Interval, Workout
 from workout.parser import parse_zwo_file
 from workout.scheduler import WorkoutScheduler
 from music.player import MusicPlayer
+from database.admin_client import create_admin_supabase
+from recommendation.recommender import estimate_cadence_from_power
+
+# new imports
+from database.workouts import list_workouts, get_workout_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +35,15 @@ class AppController:
     def __init__(self):
         self.scheduler = WorkoutScheduler(self)
         self.music_player = MusicPlayer(self.scheduler)
-        self.music_provider = self.music_player.get_provider()
+        self.music_provider = self._discover_provider()
+        self.admin_client = create_admin_supabase()
+
+    def _discover_provider(self):
+        # keep previous behaviour but defensive: provider may be None
+        try:
+            return self.music_player.get_provider()
+        except Exception:
+            return None
 
     def load_and_prepare_workout(self, path: Path) -> None:
         """
@@ -41,7 +54,68 @@ class AppController:
         workout = self._load_workout_file(path)
         self.scheduler.initialize(workout)
         # notify provider to precompute recommendations
-        self.music_provider.precompute_recommendations(workout)
+        if self.music_provider is not None:
+            try:
+                self.music_provider.precompute_recommendations(workout)
+            except Exception:
+                logger.exception("Music provider precompute failed")
+        return
+
+    def list_available_workouts(self) -> List[dict]:
+        """
+        Return a list of workouts available in the database.
+        Each item is the raw row dict as returned by database.workouts.list_workouts.
+        """
+        return list_workouts(self.admin_client)
+
+    def load_and_prepare_workout_from_db(self, record_or_id: Union[int, str, dict]) -> None:
+        """
+        Load workout from DB row (or id) and prepare scheduler.
+        """
+        if isinstance(record_or_id, (int, str)):
+            row = get_workout_by_id(record_or_id, self.admin_client)
+            if row is None:
+                raise ValueError(f"No workout found with id {record_or_id}")
+        elif isinstance(record_or_id, dict):
+            row = record_or_id
+        else:
+            raise ValueError("Invalid workout identifier")
+
+        parsed = row.get("parsed_workout") or row.get("parsedWorkout") or row.get("parsed")
+        if parsed is None:
+            # Attempt to build workout from stored flat columns if parsed blob missing.
+            # Build a minimal dict for _build_workout_from_parsed_node
+            parsed = {
+                "name": row.get("name"),
+                "author": row.get("author"),
+                "sport_type": row.get("sport_type") or row.get("sport_type_is_bike"),
+                "tags": row.get("tags") or [],
+                "description": row.get("description"),
+                # If intervals are stored separately in the row use that; else leave for fallback.
+                "intervals": row.get("intervals"),
+            }
+
+        # parsed may already be a Workout-like dict or a parsed node.
+        if isinstance(parsed, list):
+            if not parsed:
+                raise ValueError("Stored workout contains no workouts.")
+            parsed = parsed[0]
+
+        workout: Workout
+        if isinstance(parsed, dict):
+            try:
+                workout = Workout.from_parsed(parsed)
+            except ValueError:
+                workout = self._build_workout_from_parsed_node(parsed)
+        else:
+            raise ValueError("Stored workout does not contain valid parsed data.")
+
+        self.scheduler.initialize(workout)
+        if self.music_provider is not None:
+            try:
+                self.music_provider.precompute_recommendations(workout)
+            except Exception:
+                logger.exception("Music provider precompute failed")
         return
 
     def _load_workout_file(self, path: Path) -> Workout:
@@ -104,12 +178,16 @@ class AppController:
         duration = interval_info.get("duration")
         if duration is None:
             return []
+        power = _optional_float(interval_info.get("power"))
+        cadence = _optional_float(interval_info.get("cadence"))
+        if cadence is None:
+            cadence = estimate_cadence_from_power(power)
 
         return [
             Interval(
                 duration=float(duration),
-                power=_optional_float(interval_info.get("power")),
-                cadence=_optional_float(interval_info.get("cadence")),
+                power=power,
+                cadence=cadence,
                 type=node.get("type"),
                 attrs=dict(node.get("attrs", {}) or {}),
             )
