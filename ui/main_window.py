@@ -160,14 +160,14 @@ class MainWindow(QMainWindow):
                 return
             try:
                 # delegate parsing/creation to controller
-                self._controller.load_and_prepare_workout(Path(path))
+                self._controller.load_and_prepare_workout(path=Path(path))
             except Exception as exc:
                 QMessageBox.critical(self, "Workout load failed", str(exc))
                 return
         else:
             # Load from DB
             try:
-                self._controller.load_and_prepare_workout_from_db(selected_id)
+                self._controller.load_and_prepare_workout(workout_id=selected_id)
             except Exception as exc:
                 QMessageBox.critical(self, "Workout load failed", str(exc))
                 return
@@ -270,7 +270,7 @@ class MainWindow(QMainWindow):
         )
         self._music_status_label.setText(
             f"Music: {'playing' if state.status == WorkoutStatus.RUNNING else 'paused'}"
-            if self._controller.get_music_player_status()
+            if self._controller.is_music_available()
             else "Music: disabled"
         )
         self._interval_time_label.setText(
@@ -322,6 +322,6 @@ class MainWindow(QMainWindow):
         self._reset_button.setEnabled(has_workout)
         self._resync_button.setEnabled(has_workout)
         audio_output = self._controller.get_audio_output()
-        if self._controller.get_music_player_status() and audio_output is not None:
+        if self._controller.is_music_available() and audio_output is not None:
             audio_output.setVolume(1.0)
             audio_output.setMuted(False)

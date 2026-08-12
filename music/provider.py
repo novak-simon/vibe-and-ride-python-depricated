@@ -47,31 +47,7 @@ class SongProvider:
         song = self.choose_song_for_interval(interval_index)
         return song
 
-    def fetch_candidate_songs(self, repository: Optional[Any] = None) -> list:
-        """
-        Return a list of candidate song objects for the recommender.
-        Prefer caller-supplied repository or internal song pool if available.
-        The recommender will receive up to RECOMMENDER_CANDIDATE_POOL items.
-        """
-        # try common locations without forcing any architecture change
-        songs = []
-        if repository is not None:
-            try:
-                songs = list(repository.list_songs() if hasattr(repository, "list_songs") else repository.get_all())
-            except Exception:
-                try:
-                    songs = list(repository)
-                except Exception:
-                    songs = []
-        else:
-            # fallbacks: attributes that projects commonly expose
-            songs_attr = getattr(self, "songs", None) or getattr(self, "song_pool", None) or getattr(self, "_songs", None)
-            if isinstance(songs_attr, Iterable):
-                songs = list(songs_attr)
-        # deterministic ordering: do not randomize here
-        return songs[:RECOMMENDER_CANDIDATE_POOL]
-
-    def precompute_recommendations(self, workout: Any, repository: Optional[Any] = None):
+    def precompute_recommendations(self, workout: Any) -> None:
         """
         Precompute recommendations for each interval in the workout.
         Stores results in self._interval_recs keyed by interval index.
@@ -82,7 +58,7 @@ class SongProvider:
             if not intervals:
                 self._interval_recs = {}
                 return
-            candidates = self.fetch_candidate_songs(repository=repository)
+            candidates = self._songs[:RECOMMENDER_CANDIDATE_POOL]
             self._interval_recs = {}
             for idx, interval in enumerate(intervals):
                 recs = recommend(interval, candidates, limit=RECOMMENDER_LIMIT_PER_INTERVAL)

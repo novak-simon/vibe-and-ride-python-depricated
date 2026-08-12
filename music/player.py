@@ -15,6 +15,7 @@ except ImportError as exc:
 from music.model import Song
 from music.provider import SongProvider
 from workout.scheduler import WorkoutScheduler
+from workout.model import Workout
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +106,7 @@ class MusicPlayer:
         )
 
     def get_provider(self) -> SongProvider:
-        return self._provider
+        return None if self._provider is None else self._provider
 
     def _set_current_source(self, song: Song = None) -> None:
         if song is None:
@@ -159,3 +160,6 @@ class MusicPlayer:
 
     def _on_error(self, error, error_string) -> None:
         logger.error("Media player error: %s %s", error, error_string)
+
+    def workout_chosen(self, workout: Workout):
+        self._provider.precompute_recommendations(workout)

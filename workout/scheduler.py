@@ -1,12 +1,19 @@
 from __future__ import annotations
+from pathlib import Path
+import json
 
 import time
 from dataclasses import dataclass
-from typing import Callable, Optional, Any
+from typing import Callable, Optional, Any, List
 import logging
 logger = logging.getLogger(__name__)
 
 from .model import Interval, Workout
+from workout.parser import parse_zwo_file
+from recommendation.recommender import estimate_cadence_from_power
+from database.workouts import get_workout_by_id
+from database.admin_client import create_admin_supabase
+
 
 _UNSET_LAST_INTERVAL = object()
 
@@ -37,12 +44,15 @@ class WorkoutState:
 class WorkoutScheduler:
     def __init__(self, controller: Any, time_fn: Optional[Callable[[], float]] = None):
         self.controller = controller
+        self.music_player = None
         self.workout = None
         self._time_fn = time_fn or time.monotonic
         self._status = WorkoutStatus.NOT_STARTED
         self._start_monotonic: Optional[float] = None
         self._elapsed_before_start = 0.0
         self._last_interval_index = _UNSET_LAST_INTERVAL
+        self.admin_client = create_admin_supabase()
+
 
     @property
     def status(self) -> str:
@@ -60,12 +70,19 @@ class WorkoutScheduler:
     def is_finished(self) -> bool:
         return self._status == WorkoutStatus.FINISHED
 
-    def initialize(self, workout: Workout):
+    def initialize(self, path: Path = None, workout_id = None) -> None:
+        self.music_player = self.controller.get_music_player()
+        if not workout_id is None:
+            row = get_workout_by_id(workout_id, self.admin_client)
+            workout = self.db_row_to_workout(row)
+        elif not path is None:
+            workout = self._load_workout_file(path)
+        else:
+            return
         if workout is None:
             raise ValueError("Workout cannot be None")
         self.workout = workout
-        self._notify_provider_workout_chosen(self.workout)
-        return
+        self.music_player.workout_chosen(self.workout)
 
 
     def start(self) -> None:
@@ -181,6 +198,13 @@ class WorkoutScheduler:
                 elapsed += interval.duration
         return 0, None, elapsed
 
+    
+    def _optional_float(value: Optional[float]) -> Optional[float]:
+        if value is None:
+            return None
+        return float(value)
+
+
     # Attempt to notify music provider to start precomputing whenever a workout is chosen.
     # This integration is intentionally small and defensive: it only calls provider if the scheduler
     # has a reference to one (common in applications where components are wired together).
@@ -188,18 +212,153 @@ class WorkoutScheduler:
 
     def _notify_provider_workout_chosen(self, workout):
         """
-        Defensive helper: call precompute_recommendations on an attached music provider if present.
         Should be invoked right after the scheduler selects/accepts a workout.
         """
         try:
-            provider = getattr(self, "music_provider", None) or getattr(self, "provider", None)
-            if provider is None:
+            if self.provider is None:
                 return
             # If the provider supports precompute_recommendations, call it.
-            precompute = getattr(provider, "precompute_recommendations", None)
+            precompute = getattr(self.provider, "precompute_recommendations", None)
             if callable(precompute):
                 # Attempt to pass provider's known repository if available to avoid extra DB work.
-                repo = getattr(provider, "song_repository", None)
+                repo = getattr(self.provider, "song_repository", None)
                 precompute(workout, repository=repo)
         except Exception:
             logger.exception("Failed to notify music provider about selected workout")
+
+    def _load_workout_file(self, path: Path) -> Workout:
+        suffix = path.suffix.lower()
+        if suffix == ".zwo":
+            parsed = parse_zwo_file(path)
+        elif suffix == ".json":
+            with path.open("r", encoding="utf-8") as file:
+                parsed = json.load(file)
+        else:
+            raise ValueError("Unsupported workout format. Please select a .json or .zwo file.")
+
+        if isinstance(parsed, list):
+            if not parsed:
+                raise ValueError("Selected workout file contains no workouts.")
+            parsed = parsed[0]
+
+        if not isinstance(parsed, dict):
+            raise ValueError("Workout file does not contain valid workout data.")
+
+        try:
+            return Workout.from_parsed(parsed)
+        except ValueError:
+            return self._build_workout_from_parsed_node(parsed)
+
+    def _build_workout_from_parsed_node(self, parsed: dict) -> Workout:
+        if not isinstance(parsed, dict):
+            raise ValueError("Workout file does not contain valid workout data.")
+
+        intervals = self._extract_intervals_from_node(parsed)
+        if not intervals:
+            raise ValueError(
+                "Workout file does not contain interval data. "
+                f"Parsed keys: {list(parsed.keys())}"
+            )
+
+        return Workout(
+            name=parsed.get("name") or parsed.get("Name"),
+            author=parsed.get("author") or parsed.get("Author"),
+            sport_type=parsed.get("sport_type") or parsed.get("SportType"),
+            tags=list(parsed.get("tags", [])),
+            description=parsed.get("description") or parsed.get("Description"),
+            intervals=intervals,
+        )
+
+    def _extract_intervals_from_node(self, node: dict) -> List[Interval]:
+        if not isinstance(node, dict):
+            return []
+
+        if node.get("children"):
+            intervals = []
+            for child in node.get("children", []):
+                intervals.extend(self._extract_intervals_from_node(child))
+            return intervals
+
+        if node.get("type") == "IntervalsT":
+            return self._intervals_from_intervals_t(node.get("attrs", {}) or {})
+
+        interval_info = node.get("interval") or {}
+        duration = interval_info.get("duration")
+        if duration is None:
+            return []
+        power = _optional_float(interval_info.get("power"))
+        cadence = _optional_float(interval_info.get("cadence"))
+        if cadence is None:
+            cadence = estimate_cadence_from_power(power)
+
+        return [
+            Interval(
+                duration=float(duration),
+                power=power,
+                cadence=cadence,
+                type=node.get("type"),
+                attrs=dict(node.get("attrs", {}) or {}),
+            )
+        ]
+
+    def _intervals_from_intervals_t(self, attrs: dict) -> List[Interval]:
+        repeat = int(attrs.get("Repeat") or 1)
+        on_duration = attrs.get("OnDuration")
+        off_duration = attrs.get("OffDuration")
+        on_power = _optional_float(attrs.get("OnPower"))
+        off_power = _optional_float(attrs.get("OffPower"))
+        cadence = _optional_float(attrs.get("Cadence"))
+
+        intervals: List[Interval] = []
+        for _ in range(repeat):
+            if on_duration is not None:
+                intervals.append(
+                    Interval(
+                        duration=float(on_duration),
+                        power=on_power,
+                        cadence=cadence,
+                        type="IntervalsT",
+                        attrs=dict(attrs),
+                    )
+                )
+            if off_duration is not None:
+                intervals.append(
+                    Interval(
+                        duration=float(off_duration),
+                        power=off_power,
+                        cadence=cadence,
+                        type="IntervalsT",
+                        attrs=dict(attrs),
+                    )
+                )
+        return intervals
+
+    def db_row_to_workout(self, row: int|str|dict) -> Workout:
+        intervals = row.get("intervals")
+        if isinstance(intervals, str):
+            try:
+                intervals = json.loads(intervals)
+            except json.JSONDecodeError:
+                pass
+        parsed = {
+            "name": row.get("name"),
+            "author": row.get("author"),
+            "sport_type": row.get("sport_type") or row.get("sport_type_is_bike"),
+            "tags": row.get("tags") or [],
+            "description": row.get("description"),
+            "intervals": intervals,
+        }
+
+        if isinstance(parsed, list):
+            if not parsed:
+                raise ValueError("Stored workout contains no workouts.")
+            parsed = parsed[0]
+
+        if not isinstance(parsed, dict):
+            raise ValueError("Stored workout does not contain valid parsed data.")
+
+        try:
+            workout = Workout.from_parsed(parsed)
+        except Exception:
+            workout = self._build_workout_from_parsed_node(parsed)
+        return workout
