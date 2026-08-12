@@ -123,7 +123,7 @@ def update_song_analysis(client, song_id: int, analysis: AudioAnalysis) -> None:
     query = table.update(record).eq("id", song_id)
     _execute_query(query)
 
-def get_songs_around_target(client, target_algorithm_cadence: int, target_algorithm_power: int, algorithm_cadence_toleration: int = 5, algorithm_power_toleration: float = 0.1, limit: int = 10):
+def get_songs_around_target(client, target_algorithm_cadence: int, target_algorithm_power: int, algorithm_cadence_toleration: int = 5, algorithm_power_toleration: str = 10, limit: int = 10):
     gc = int(target_algorithm_cadence - algorithm_cadence_toleration)
     lc = int(target_algorithm_cadence + algorithm_cadence_toleration)
     gp = int(target_algorithm_power - algorithm_power_toleration)

@@ -69,6 +69,7 @@ class SongProvider:
         """
         if self._interval_recs:
             recs = self._interval_recs[interval_index]
+            print(f"Number of recs: {len(recs)}")
         else:
             recs = []
         if recs:

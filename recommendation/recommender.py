@@ -144,7 +144,7 @@ def approximate_filter_by_interval(interval: Interval) -> List[Song]:
     print(f"Power: {interval.power}, Cadence: {interval.cadence}")
     interval_algorithm_cadence = get_algorithm_cadence(interval.cadence)
     interval_algorithm_power = interval.power*100 if not interval.power is None else 60
-    pool = get_songs_around_target(admin_client, interval_algorithm_cadence, interval_algorithm_power, limit=10)
+    pool = get_songs_around_target(admin_client, interval_algorithm_cadence, interval_algorithm_power, limit=10, algorithm_power_toleration=50) #Temporarily set to 50
     if pool:
         return pool
     else:   #Try to get songs that don't match that well, if it fails, gets at least some songs
