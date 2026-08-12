@@ -160,7 +160,6 @@ class MusicPlayer:
         logger.info("Media status changed: %s", status)
         if status is QMediaPlayer.MediaStatus.LoadedMedia:
             print("Loaded Media")
-            print(f"Song: {self._current_song}")
             print(f"Start time planned: {self._current_song.start_time}")
             self._player.setPosition(self._current_song.start_time)
             print(f"Position {self._player.position()}")

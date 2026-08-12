@@ -21,6 +21,8 @@ from workout.model import Interval
 from music.model import Song
 from user.model import User
 from user.service import getCurrentUser
+from database.songs import get_songs_around_target, fetch_songs
+from database.admin_client import create_admin_supabase
 
 
 
@@ -32,6 +34,8 @@ USER_GENRES = [
     "rock",
     "pop",
 ]
+
+admin_client = create_admin_supabase()
 
 # Absolute BPM tolerance used when comparing effective BPM to target cadence.
 # Initial sensible value: 4 BPM (allows small tempo detection noise while keeping selectivity).
@@ -64,49 +68,6 @@ def _get(obj: Any, key: str, default=None):
     if isinstance(obj, dict):
         return obj.get(key, default)
     return getattr(obj, key, default)
-
-
-
-
-# === Cadence resolution ===
-def estimate_cadence_from_power(power: float, interval_context: Optional[Any] = None) -> Optional[float]:
-    """
-    Simple documented approximation mapping power -> cadence (fallback).
-    Formula (first minimal implementation):
-      max(75, min(115, 70 + 30 * p))
-    Clamped to [75, 115] RPM.
-
-    Rationale: 80 RPM is a reasonable mid-point for many structured workouts.
-    This is only a heuristic fallback for intervals that specify power but not cadence.
-    """
-    try:
-        p = float(power)
-    except Exception:
-        return 80 #Default cadence value if there is literally no information
-    cadence = max(75, min(115, 70 + 30 * p))
-    logger.debug("estimate_cadence_from_power: power=%s -> cadence=%.2f", power, cadence)
-    return cadence
-
-
-def get_target_cadence(interval: Any) -> Optional[float]:
-    """
-    Resolve target cadence for a workout interval.
-    Priority:
-      1. explicit interval.cadence
-      2. estimate from interval.power (using estimate_cadence_from_power)
-      3. None
-    """
-    cadence = _get(interval, "cadence", None)
-    if cadence is not None:
-        try:
-            return float(cadence)
-        except Exception:
-            return None
-    power = _get(interval, "power", None)
-    if power is not None:
-        return estimate_cadence_from_power(power, interval)
-    return None
-
 
 # === Genre filter ===
 def song_matches_user_genres(song: Any, user_genres: Sequence[str] = USER_GENRES) -> bool:
@@ -162,100 +123,102 @@ def calculate_bpm_match(song_bpm: Optional[float], target_cadence: Optional[floa
             best_mult = mult
     compatible = best_diff is not None and best_diff <= BPM_TOLERANCE
     return BPMMatch(compatible=compatible, effective_bpm=best_eff, difference=best_diff, multiplier=best_mult)
+def get_algorithm_cadence(cadence: int) -> int:
+    """Normalize cadence to 60-120 range using half/double multipliers."""
+    max_iterations = 20  # Prevent infinite loops
+    iterations = 0
+    while cadence not in range(60, 121) and iterations < max_iterations:
+        if cadence < 60:
+            cadence *= 2
+        else:
+            cadence //= 2
+        iterations += 1
+    if iterations >= max_iterations:
+        logger.warning("Could not normalize cadence %s to 60-120 range", cadence)
+        return 120  # Fallback
+    return cadence
+
 
 # === Parts of Recommendation engine ===
-def approximate_filter_by_interval(songs: List[Song], interval: Interval) -> List[Song]:
-    return []
+def approximate_filter_by_interval(interval: Interval) -> List[Song]:
+    print(f"Power: {interval.power}, Cadence: {interval.cadence}")
+    interval_algorithm_cadence = get_algorithm_cadence(interval.cadence)
+    interval_algorithm_power = interval.power*100 if not interval.power is None else 60
+    pool = get_songs_around_target(admin_client, interval_algorithm_cadence, interval_algorithm_power, limit=10)
+    if pool:
+        return pool
+    else:   #Try to get songs that don't match that well, if it fails, gets at least some songs
+        pool = get_songs_around_target(admin_client, interval_algorithm_cadence, interval_algorithm_power, 10, 0.2, limit=10)
+        if pool:
+            return pool
+        else:
+            pool = fetch_songs(admin_client)
+            return pool
+
 
 def rank_by_user_preference(songs: List[Song], user: User) -> List[Song]:
-    return []
+    """Filter songs by user genre preference."""
+    if user is None or not songs:
+        return songs
+    return [s for s in songs if song_matches_user_genres(s, user.genres if hasattr(user, 'genres') else USER_GENRES)]
+
 
 def rank_by_interval_match(songs: List[Song], interval: Interval) -> List[Recommendation]:
-    return []
+    """Rank songs by BPM compatibility with interval target cadence."""
+    if not songs or interval.cadence is None:
+        return []
+    
+    recommendations = []
+    for song in songs:
+        sbpm = _get(song, "bpm", None)
+        if sbpm is None:
+            continue
+        match = calculate_bpm_match(sbpm, interval.cadence)
+        if not match.compatible:
+            continue
+        conf = _get(song, "bpm_confidence", None)
+        recommendations.append((song, sbpm, conf, match))
+    
+    # Sort by confidence (desc), then by BPM difference (asc), then by song id
+    def sort_key(entry):
+        s, sbpm, conf, match = entry
+        has_conf = 1 if conf is not None else 0
+        conf_val = float(conf) if conf is not None else 0.0
+        diff_val = float(match.difference) if match.difference is not None else float("inf")
+        sid = _get(s, "id", None) or str(s)
+        return (-has_conf, -conf_val, diff_val, str(sid))
+    
+    recommendations.sort(key=sort_key)
+    
+    return [
+        Recommendation(
+            song=s,
+            song_bpm=float(sbpm) if sbpm is not None else None,
+            bpm_confidence=float(conf) if conf is not None else None,
+            target_cadence=interval.cadence,
+            effective_bpm=match.effective_bpm,
+            bpm_difference=match.difference,
+            tempo_multiplier=match.multiplier,
+        )
+        for s, sbpm, conf, match in recommendations
+    ]
+
 
 # === Recommendation engine ===
-def recommend(interval: Interval, songs: List[Song], limit: int = 10, user_genres: Sequence[str] = USER_GENRES) -> List[Recommendation]:
+def recommend(interval: Interval, limit: int = 10, user_genres: Sequence[str] = USER_GENRES) -> List[Recommendation]:
     """
     Recommend a ranked list of songs for a given workout interval.
-
-    Steps:
-      - resolve target cadence
-      - filter songs by user genres
-      - filter songs with valid BPM and that are BPM-compatible (considering half/double)
-      - rank primarily by bpm_confidence (higher better), then by bpm_difference (lower better), then by song id deterministically
     """
-    target_cadence = get_target_cadence(interval)
+    target_cadence = interval.cadence
     logger.info("Recommendation request: interval=%s => target_cadence=%s", getattr(interval, "__dict__", str(interval)), target_cadence)
 
     if target_cadence is None:
         logger.info("No target cadence could be determined for interval; returning empty recommendations.")
         return []
+    
     user = getCurrentUser()
-    first_candidate_pool = approximate_filter_by_interval(songs, interval)
+    first_candidate_pool = approximate_filter_by_interval(interval)
     second_candidate_pool = rank_by_user_preference(first_candidate_pool, user)
     third_candidate_pool = rank_by_interval_match(second_candidate_pool, interval)
-    return third_candidate_pool
-    """
-    # Genre filter
-    genre_candidates = [s for s in songs if song_matches_user_genres(s, user_genres)]
-    print(f"Candidates by genre: {len(genre_candidates)}")
-    logger.debug("Genre candidates: %d / %d", len(genre_candidates), len(songs))
-    if not genre_candidates:
-        logger.info("No songs matched user genres: %s", user_genres)
-        return []
-
-    # Evaluate BPM compatibility
-    candidates = []
-    for s in genre_candidates:
-        sbpm = _get(s, "bpm", None)
-        if sbpm is None:
-            continue
-        match = calculate_bpm_match(sbpm, target_cadence)
-        if not match.compatible:
-            continue
-        conf = _get(s, "bpm_confidence", None)
-        candidates.append((s, sbpm, conf, match))
-
-    if not candidates:
-        logger.info("No BPM-compatible songs found for target cadence %s", target)
-        return []
-
-    # Deterministic ranking:
-    # 1. has_confidence (True before False)
-    # 2. bpm_confidence (desc)
-    # 3. bpm_difference (asc)
-    # 4. stable song id (if available) or str(song)
-    def song_sort_key(entry):
-        s, sbpm, conf, match = entry
-        has_conf = 1 if (conf is not None) else 0
-        conf_val = float(conf) if conf is not None else 0.0
-        diff_val = float(match.difference) if match.difference is not None else float("inf")
-        sid = _get(s, "id", None)
-        sid_key = str(sid) if sid is not None else str(s)
-        # we want has_conf True first => sort by -has_conf, then -conf_val
-        return (-has_conf, -conf_val, diff_val, sid_key)
-
-    candidates.sort(key=song_sort_key)
-
-    recs: List[Recommendation] = []
-    for s, sbpm, conf, match in candidates[:limit]:
-        recs.append(Recommendation(
-            song=s,
-            song_bpm=float(sbpm) if sbpm is not None else None,
-            bpm_confidence=(float(conf) if conf is not None else None),
-            target_cadence=target,
-            effective_bpm=match.effective_bpm,
-            bpm_difference=match.difference,
-            tempo_multiplier=match.multiplier,
-        ))
-
-    logger.info("Top %d recommendations (target %.1f): %d results", limit, target, len(recs))
-    for r in recs[:10]:
-        logger.debug("Recommendation: id=%s bpm=%.2f eff=%.2f diff=%.2f conf=%s mult=%s",
-                     _get(r.song, "id", None),
-                     r.song_bpm or 0.0,
-                     r.effective_bpm or 0.0,
-                     r.bpm_difference or 0.0,
-                     r.bpm_confidence,
-                     r.tempo_multiplier)
-    """
+    
+    return third_candidate_pool[:limit]

@@ -52,10 +52,9 @@ class SongProvider:
             if not intervals:
                 self._interval_recs = {}
                 return
-            candidates = self._songs[:RECOMMENDER_CANDIDATE_POOL]
             self._interval_recs = {}
             for idx, interval in enumerate(intervals):
-                recs = recommend(interval, candidates, limit=RECOMMENDER_LIMIT_PER_INTERVAL)
+                recs = recommend(interval, limit=RECOMMENDER_LIMIT_PER_INTERVAL)
                 self._interval_recs[idx] = recs
         except Exception:
             # never crash the host when precomputing; log and continue

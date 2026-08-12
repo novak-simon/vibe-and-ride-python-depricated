@@ -71,12 +71,7 @@ def get_playable_songs(client: Any) -> List[Song]:
         client.table("songs")
         .select("*")
     )
-    result = query.execute()
-    if isinstance(result, dict):
-        rows = result.get("data", [])
-    else:
-        rows = getattr(result, "data", []) or []
-
+    rows = _execute_query(query)
     return [Song.from_dict(row) for row in rows]
 
 def fetch_unanalyzed_songs(client, limit: int = 50) -> List[Song]:
@@ -100,7 +95,7 @@ def fetch_unanalyzed_songs(client, limit: int = 50) -> List[Song]:
 
     return [Song.from_dict(row) for row in rows]
 
-def fetch_songs(client, limit: int = 50) -> List[Song]:
+def fetch_songs(client, limit: int = 10) -> List[Song]:
     table = _get_table(client, "songs")
     try:
         query = (
@@ -127,3 +122,24 @@ def update_song_analysis(client, song_id: int, analysis: AudioAnalysis) -> None:
     }
     query = table.update(record).eq("id", song_id)
     _execute_query(query)
+
+def get_songs_around_target(client, target_algorithm_cadence: int, target_algorithm_power: int, algorithm_cadence_toleration: int = 5, algorithm_power_toleration: float = 0.1, limit: int = 10):
+    gc = int(target_algorithm_cadence - algorithm_cadence_toleration)
+    lc = int(target_algorithm_cadence + algorithm_cadence_toleration)
+    gp = int(target_algorithm_power - algorithm_power_toleration)
+    lp = int(target_algorithm_power + algorithm_power_toleration)
+    table = _get_table(client, "songs")
+    try:
+        query = (
+            table.select("*")
+            .limit(limit)
+            .gte("algorithm_cadence", gc)
+            .lte("algorithm_cadence", lc)
+            .gte("algorithm_power", gp)
+            .lte("algorithm_power", lp)
+        )
+        rows = _execute_query(query)
+    except Exception:
+        raise LookupError()
+    
+    return [Song.from_dict(row) for row in rows]

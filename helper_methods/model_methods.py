@@ -30,3 +30,20 @@ def _str_to_list(value: str) -> List:
     if value is None:
         return []
     return ast.literal_eval(value)
+
+def estimate_cadence_from_power(power: float, interval_context: Optional[Any] = None) -> Optional[float]:
+    """
+    Simple documented approximation mapping power -> cadence (fallback).
+    Formula (first minimal implementation):
+      max(75, min(115, 70 + 30 * p))
+    Clamped to [75, 115] RPM.
+
+    Rationale: 80 RPM is a reasonable mid-point for many structured workouts.
+    This is only a heuristic fallback for intervals that specify power but not cadence.
+    """
+    try:
+        p = float(power)
+    except Exception:
+        return 80 #Default cadence value if there is literally no information
+    cadence = max(75, min(115, 70 + 30 * p))
+    return cadence

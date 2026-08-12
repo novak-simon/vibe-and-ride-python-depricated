@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
-from recommendation.recommender import estimate_cadence_from_power
+from helper_methods.model_methods import estimate_cadence_from_power
 
 ZwoValue = Union[str, int, float, bool, None]
 ZwoNode = Dict[str, Any]
@@ -15,6 +15,7 @@ class Interval:
     cadence: Optional[float] = None
     type: Optional[str] = None
     attrs: Dict[str, ZwoValue] = field(default_factory=dict)
+
 
     @staticmethod
     def from_node(node: ZwoNode) -> "Interval":

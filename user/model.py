@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Dict, Any
 
 from helper_methods.model_methods import _optional_str, _optional_int_or_none, _optional_int, _optional_float_list, _str_to_list
@@ -7,7 +7,7 @@ from helper_methods.model_methods import _optional_str, _optional_int_or_none, _
 class User:
     id: int = 0
     name: str = "User"
-    genre_preferences: List[str] = ["pop", "rock"]
+    genre_preferences: List[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "User":

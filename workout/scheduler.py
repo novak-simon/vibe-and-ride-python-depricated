@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 from .model import Interval, Workout
 from workout.parser import parse_zwo_file
-from recommendation.recommender import estimate_cadence_from_power
 from database.workouts import get_workout_by_id
 from database.admin_client import create_admin_supabase
+from helper_methods.model_methods import estimate_cadence_from_power
 
 
 _UNSET_LAST_INTERVAL = object()
