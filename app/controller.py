@@ -50,23 +50,23 @@ class AppController:
     def get_current_song_name(self) -> str|None:
         return self.music_player.current_song_name()
 
-    def get_music_player_status(self) -> bool:
+    def is_music_available(self) -> bool:
         return self.music_player.available
 
     def get_audio_output(self):
         return self.music_player.audio_output
 
-    def is_scheduler_available(self) -> bool:
+    def is_workout_available(self) -> bool:
         return False if self.scheduler is None else True
 
-    def get_scheduler_state(self):
+    def get_workout_state(self):
         return self.scheduler.get_state()
-
-    def start_workout(self) -> None:
-        self.scheduler.start()
 
     def get_workout(self):
         return self.scheduler.workout
+    
+    def start_workout(self) -> None:
+            self.scheduler.start()
 
     def pause(self):
         self.scheduler.pause()
