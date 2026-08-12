@@ -18,6 +18,11 @@ from typing import Any, List, Optional, Sequence
 import logging
 import ast
 
+from workout.model import Interval
+from music.model import Song
+from user.model import User
+from user.service import getCurrentUser
+
 
 
 logger = logging.getLogger(__name__)
@@ -163,9 +168,18 @@ def calculate_bpm_match(song_bpm: Optional[float], target_cadence: Optional[floa
     compatible = best_diff is not None and best_diff <= BPM_TOLERANCE
     return BPMMatch(compatible=compatible, effective_bpm=best_eff, difference=best_diff, multiplier=best_mult)
 
+# === Parts of Recommendation engine ===
+def approximate_filter_by_interval(songs: List[Song], interval: Interval) -> List[Song]:
+    return []
+
+def rank_by_user_preference(songs: List[Song], user: User) -> List[Song]:
+    return []
+
+def rank_by_interval_match(songs: List[Song], interval: Interval) -> List[Song]:
+    return []
 
 # === Recommendation engine ===
-def recommend(interval: Any, songs: Sequence[Any], limit: int = 10, user_genres: Sequence[str] = USER_GENRES) -> List[Recommendation]:
+def recommend(interval: Interval, songs: List[Song], limit: int = 10, user_genres: Sequence[str] = USER_GENRES) -> List[Recommendation]:
     """
     Recommend a ranked list of songs for a given workout interval.
 
@@ -175,13 +189,18 @@ def recommend(interval: Any, songs: Sequence[Any], limit: int = 10, user_genres:
       - filter songs with valid BPM and that are BPM-compatible (considering half/double)
       - rank primarily by bpm_confidence (higher better), then by bpm_difference (lower better), then by song id deterministically
     """
-    target = get_target_cadence(interval)
+    target_cadence = get_target_cadence(interval)
     logger.info("Recommendation request: interval=%s => target_cadence=%s", getattr(interval, "__dict__", str(interval)), target)
 
-    if target is None:
+    if target_cadence is None:
         logger.info("No target cadence could be determined for interval; returning empty recommendations.")
         return []
-
+    user = getCurrentUser()
+    first_candidate_pool = approximate_filter_by_interval(songs, interval)
+    second_candidate_pool = rank_by_user_preference(first_candidate_pool, user)
+    third_candidate_pool = rank_by_interval_match(second_candidate_pool, interval)
+    return third_candidate_pool
+    """
     # Genre filter
     genre_candidates = [s for s in songs if song_matches_user_genres(s, user_genres)]
     print(f"Candidates by genre: {len(genre_candidates)}")
@@ -196,7 +215,7 @@ def recommend(interval: Any, songs: Sequence[Any], limit: int = 10, user_genres:
         sbpm = _get(s, "bpm", None)
         if sbpm is None:
             continue
-        match = calculate_bpm_match(sbpm, target)
+        match = calculate_bpm_match(sbpm, target_cadence)
         if not match.compatible:
             continue
         conf = _get(s, "bpm_confidence", None)
@@ -244,4 +263,4 @@ def recommend(interval: Any, songs: Sequence[Any], limit: int = 10, user_genres:
                      r.bpm_difference or 0.0,
                      r.bpm_confidence,
                      r.tempo_multiplier)
-    return recs
+    """
