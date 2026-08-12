@@ -64,7 +64,7 @@ class MainWindow(QMainWindow):
         self._interval_detail_label.setWordWrap(True)
 
         self._song_label = QLabel(
-            f"Song: {self._controller.get_current_song_name() or 'none'}"
+            f"Song: {'none'}"
         )
         self._song_label.setWordWrap(True)
         self._music_status_label = QLabel(

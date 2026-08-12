@@ -1,5 +1,6 @@
 from typing import Any, Optional, List
 import ast
+import json
 
 def _optional_str(value: Any) -> Optional[str]:
     if value is None:
@@ -27,9 +28,26 @@ def _optional_float_list(value: Any) -> Optional[List[float]]:
     return [float(item) for item in list(value)]
 
 def _str_to_list(value: str) -> List:
-    if value is None:
+    """Convert string representation of list to actual list. Handles None, empty strings, and actual lists."""
+    if value is None or value == "":
         return []
-    return ast.literal_eval(value)
+    if isinstance(value, list):
+        return value
+    try:
+        result = ast.literal_eval(value)
+        return result if isinstance(result, list) else []
+    except (ValueError, SyntaxError):
+        return []
+
+def _str_to_dict(value: str) -> dict:
+    if value is None or value == "":
+        return {}
+    if isinstance(value, dict):
+        return value
+    try:
+        return json.loads(value)
+    except (ValueError, json.JSONDecodeError):
+        return {}
 
 def estimate_cadence_from_power(power: float, interval_context: Optional[Any] = None) -> Optional[float]:
     """

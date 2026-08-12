@@ -14,6 +14,7 @@ import dotenv
 from database.admin_client import get_admin_supabase
 from database import songs as songs_repo
 from music.model import Song
+from helper_methods.model_methods import _str_to_dict
 
 dotenv.load_dotenv()
 
@@ -85,16 +86,16 @@ def fetch_jamendo_tracks(client_id: str, limit: int = MAX_TRACKS) -> List[Dict[s
     return results[:limit]
 
 
-def _normalize_genre(genres_value: Any) -> Optional[str]:
-    if not genres_value:
+def _normalize_list(value: Any) -> Optional[str]:
+    if not value:
         return None
-    if isinstance(genres_value, str):
-        genre = genres_value.strip()
+    if isinstance(value, str):
+        genre = value.strip()
         return genre or None
-    if isinstance(genres_value, Iterable):
-        items = [str(item).strip() for item in genres_value if item]
+    if isinstance(value, Iterable):
+        items = [str(item).strip() for item in value if item]
         return ",".join(items) if items else None
-    return str(genres_value).strip() or None
+    return str(value).strip() or None
 
 
 def jamendo_speed_to_int(speed_value: Any) -> int:
@@ -108,49 +109,42 @@ def jamendo_result_to_song(result: Dict[str, Any]) -> Song:
     if not isinstance(result, dict):
         raise ValueError("Jamendo track result must be a JSON object")
 
-    try:
-        title = str(result["name"])
-        jamendo_id = str(result["id"])
-    except KeyError as exc:
-        raise ValueError(f"Missing required Jamendo field: {exc.args[0]}") from exc
-
-    artist = result.get("artist_name")
-    if artist is not None:
-        artist = str(artist)
+    result["jamendo_id"] = result.pop("id")
+    result["title"] = result.pop("name")
+    result["artist"] = result.pop("artist_name")
 
     musicinfo = result.get("musicinfo") or {}
     if not isinstance(musicinfo, dict):
         musicinfo = {}
+    result["lang"] = musicinfo.get("lang")
+    result["gender"] = musicinfo.get("gender")
+    result["is_instrumental"] = True if musicinfo.get("vocalinstrumental") is "instrumental" else False
+    result["is_electric"] = True if musicinfo.get("acousticelectric") is "electric" else False
+
 
     tags = musicinfo.get("tags") or {}
     if not isinstance(tags, dict):
         tags = {}
 
-    genre = _normalize_genre(tags.get("genres"))
-    if not genre == None:
-        genre = genre.split(",")
-    speed = jamendo_speed_to_int(musicinfo.get("speed"))
+    result["genre"] = _normalize_list(tags.get("genres"))
+    result["instruments"] = _normalize_list(tags.get("instruments"))
+    result["vartags"] = _normalize_list(tags.get("vartags"))
+    result["speed"] = jamendo_speed_to_int(musicinfo.get("speed"))
 
     # extract audio/download urls safely
     audio_url = result.get("audio")
     if audio_url is not None:
-        audio_url = str(audio_url)
+        result["audio_url"] = str(audio_url)
+    else:
+        result["audio_url"] = audio_url
 
     download_url = result.get("audiodownload")
     if download_url is not None:
-        download_url = str(download_url)
-
-    return Song(
-        title=title,
-        jamendo_id=jamendo_id,
-        artist=artist,
-        genre=genre,
-        speed=speed,
-        bpm=0,
-        bpm_confidence=0,
-        audio_url=audio_url,
-        download_url=download_url,
-    )
+        result["download_url"] = str(download_url)
+    else:
+        result["download_url"] = download_url
+    result["waveform"] = _str_to_dict(result.get("waveform")).get("peaks")
+    return Song.from_dict(result)
 
 
 def _jamendo_id_exists(jamendo_id: str, client: Any) -> bool:

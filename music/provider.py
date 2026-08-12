@@ -28,6 +28,8 @@ class SongProvider:
 
     def get_current_song(self) -> Optional[Song]:
         interval_index = self.scheduler.current_interval_index()
+        if self.scheduler.workout is None:
+            return Song("None")
         return self.choose_song_for_interval(interval_index)
 
     def next_song(self, interval_changed: bool = False) -> Optional[Song]:
