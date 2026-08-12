@@ -45,21 +45,28 @@ def jamendo_id_exists(jamendo_id: str, client: Any | None = None) -> bool:
     return bool(_extract_data(response))
 
 
-def add_song(song: Song, client: Any | None = None) -> Song:
+def add_song(song: Song, client: Any | None = None, force: bool = False) -> Song:
     if not song.jamendo_id:
         raise ValueError("Song must have a jamendo_id")
 
     client = _effective_client(client)
-
-    if jamendo_id_exists(song.jamendo_id, client=client):
-        raise ValueError(f"Song with jamendo_id={song.jamendo_id} already exists")
-
-    response = (
-        client.table("songs")
-        .insert(song.to_record())
-        .select("*")
-        .execute()
-    )
+    data = song.to_record()
+    if not force:
+        if jamendo_id_exists(song.jamendo_id, client=client):
+                raise ValueError(f"Song with jamendo_id={song.jamendo_id} already exists")
+        response = (
+            client.table("songs")
+            .insert(song.to_record())
+            .select("*")
+            .execute()
+        )
+    else:
+        response = (
+            client.table("songs")
+            .upsert(data, on_conflict="jamendo_id")
+            .select("*")
+            .execute()
+        )
     records = _extract_data(response)
     if not records:
         raise RuntimeError("Failed to insert song")

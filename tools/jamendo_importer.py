@@ -29,7 +29,6 @@ except ImportError as exc:
 logger = logging.getLogger(__name__)
 
 JAMENDO_ENDPOINT = "https://api.jamendo.com/v3.0/tracks/"
-MAX_TRACKS = 200
 SPEED_MAP = {
     "low": 1,
     "medium": 2,
@@ -47,7 +46,7 @@ def load_jamendo_client_id() -> str:
     return client_id
 
 
-def fetch_jamendo_tracks(client_id: str, limit: int = MAX_TRACKS) -> List[Dict[str, Any]]:
+def fetch_jamendo_tracks(client_id: str, limit: int) -> List[Dict[str, Any]]:
     params = {
         "client_id": client_id,
         "format": "jsonpretty",
@@ -90,11 +89,10 @@ def _normalize_list(value: Any) -> Optional[str]:
     if not value:
         return None
     if isinstance(value, str):
-        genre = value.strip()
-        return genre or None
+        processed = value.strip()
+        return processed or None
     if isinstance(value, Iterable):
-        items = [str(item).strip() for item in value if item]
-        return ",".join(items) if items else None
+        return value
     return str(value).strip() or None
 
 
@@ -118,14 +116,12 @@ def jamendo_result_to_song(result: Dict[str, Any]) -> Song:
         musicinfo = {}
     result["lang"] = musicinfo.get("lang")
     result["gender"] = musicinfo.get("gender")
-    result["is_instrumental"] = True if musicinfo.get("vocalinstrumental") is "instrumental" else False
-    result["is_electric"] = True if musicinfo.get("acousticelectric") is "electric" else False
-
+    result["is_instrumental"] = True if musicinfo.get("vocalinstrumental") == "instrumental" else False
+    result["is_electric"] = True if musicinfo.get("acousticelectric") == "electric" else False
 
     tags = musicinfo.get("tags") or {}
     if not isinstance(tags, dict):
         tags = {}
-
     result["genre"] = _normalize_list(tags.get("genres"))
     result["instruments"] = _normalize_list(tags.get("instruments"))
     result["vartags"] = _normalize_list(tags.get("vartags"))
@@ -151,7 +147,7 @@ def _jamendo_id_exists(jamendo_id: str, client: Any) -> bool:
     return songs_repo.jamendo_id_exists(jamendo_id, client=client)
 
 
-def import_jamendo_tracks(results: Iterable[Dict[str, Any]]) -> Dict[str, int]:
+def import_jamendo_tracks(results: Iterable[Dict[str, Any]], force: bool = False) -> Dict[str, int]:
     stats = {"fetched": 0, "inserted": 0, "skipped": 0, "failed": 0}
     results = list(results)
     stats["fetched"] = len(results)
@@ -177,13 +173,13 @@ def import_jamendo_tracks(results: Iterable[Dict[str, Any]]) -> Dict[str, int]:
                 exists = False
 
             print(f" -> jamendo_id_exists={exists}")
-            if exists:
+            if exists and not force:
                 print("SKIPPED (already exists)")
                 stats["skipped"] += 1
                 continue
 
             print(f" -> inserting song with jamendo_id={song.jamendo_id}")
-            songs_repo.add_song(song, client=admin_client)
+            songs_repo.add_song(song, client=admin_client, force=force)
             print("INSERTED")
             stats["inserted"] += 1
         except ValueError as exc:
@@ -196,15 +192,15 @@ def import_jamendo_tracks(results: Iterable[Dict[str, Any]]) -> Dict[str, int]:
     return stats
 
 
-def run_importer() -> int:
+def run_importer(limit, force: bool = False) -> int:
     client_id = load_jamendo_client_id()
 
     print("Fetching songs from Jamendo...")
-    tracks = fetch_jamendo_tracks(client_id, limit=MAX_TRACKS)
+    tracks = fetch_jamendo_tracks(client_id, limit)
     print(f"Received {len(tracks)} tracks.\n")
     print("Importing songs...\n")
 
-    stats = import_jamendo_tracks(tracks)
+    stats = import_jamendo_tracks(tracks, force)
 
     print("\nImport complete.\n")
     print(f"Fetched: {stats['fetched']}")

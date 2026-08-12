@@ -27,7 +27,7 @@ class Song:
     algorithm_power: int = 60
     waveform: List[int] = None
     image: Optional[str] = None
-    share_url: Optional[str] = None
+    shareurl: Optional[str] = None
     lang: Optional[str] = None
     gender: Optional[str] = None
     is_instrumental: Optional[bool] = None
@@ -56,7 +56,7 @@ class Song:
             algorithm_power=_optional_int(data.get("algorithm_power"), default=60),
             waveform=_str_to_list(data.get("waveform")),
             image=_optional_str(data.get("image")),
-            share_url=_optional_str(data.get("share_url")),
+            shareurl=_optional_str(data.get("shareurl")),
             lang=_optional_str(data.get("lang")),
             gender=_optional_str(data.get("gender")),
             is_instrumental=bool(data.get("is_instrumental")),
@@ -81,7 +81,9 @@ class Song:
             "algorithm_power": self.algorithm_power,
             "waveform": self.waveform,
             "image": self.image,
-            "share_url": self.share_url,
+            "shareurl": self.shareurl,
+            "vartags": self.vartags,
+            "instruments": self.instruments,
             "lang": self.lang,
             "gender": self.gender,
             "is_instrumental": self.is_instrumental,
