@@ -117,7 +117,6 @@ def song_matches_user_genres(song: Any, user_genres: Sequence[str] = USER_GENRES
       - song.genres as list/sequence
     """
     g = _get(song, "genre", None)
-    g = _genre_to_list(g)
     if g is None:
         g = _get(song, "genres", None)
     if g is None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from helper_methods.model_methods import _optional_float_list, _optional_int, _optional_int_or_none, _optional_str
+from helper_methods.model_methods import _optional_float_list, _optional_int, _optional_int_or_none, _optional_str, _str_to_list
 
 @dataclass(frozen=True)
 class Song:
@@ -28,7 +28,7 @@ class Song:
             title=str(data["title"]),
             jamendo_id=str(data["jamendo_id"]),
             artist=_optional_str(data.get("artist")),
-            genre=_optional_str(data.get("genre")),
+            genre=_str_to_list(_optional_str(data.get("genre"))),
             speed=_optional_int(data.get("speed"), default=0),
             bpm=_optional_int(data.get("bpm"), default=0),
             bpm_confidence=_optional_int(data.get("bpm_confidence"), default=0),
