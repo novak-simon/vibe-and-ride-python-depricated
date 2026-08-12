@@ -10,7 +10,7 @@ from music.model import Song
 from recommendation.recommender import recommend, Recommendation  # new dependency
 
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".ogg", ".flac", ".m4a"}
-RECOMMENDER_CANDIDATE_POOL = 100
+RECOMMENDER_CANDIDATE_POOL = 200
 RECOMMENDER_LIMIT_PER_INTERVAL = 10
 
 
@@ -22,14 +22,6 @@ class SongProvider:
         self._interval_recs = {}  # type: dict[int, list]
         self.scheduler: WorkoutScheduler = scheduler
         self._load_songs()
-
-    def _load_songs(self) -> None:
-        try:
-            songs = get_playable_songs(client=self._client)
-        except Exception:
-            songs = []
-            print("Unable to get songs from the database")
-        self._songs = songs
 
     def has_songs(self) -> bool:
         return bool(self._songs)
@@ -54,7 +46,7 @@ class SongProvider:
         Safe to call multiple times; will overwrite previous cache for this provider instance.
         """
         try:
-            intervals = getattr(workout, "intervals", None) or getattr(workout, "steps", None) or []
+            intervals = workout.intervals
             if not intervals:
                 self._interval_recs = {}
                 return
@@ -68,22 +60,11 @@ class SongProvider:
             import logging
             logging.getLogger(__name__).exception("precompute_recommendations failed")
 
-    def get_recommendations_for_interval(self, interval_index: int, fallback_repository: Optional[Any] = None, limit: Optional[int] = None) -> list:
-        """
-        Return precomputed recommendations for an interval index.
-        If not precomputed, compute on-demand using fallback_repository or internal pool.
-        """
-        try:
-            recs = self._interval_recs[interval_index]
-            return recs[:limit] if limit is not None else recs
-        except Exception:
-            return []
-
     def choose_song_for_interval(self, interval_index: int) -> Optional[Any]:
         """
         Return the top recommended song for an interval.
         """
-        recs = self.get_recommendations_for_interval(interval_index)
+        recs = self._interval_recs[interval_index]
         if recs:
             print(f"Song index: {self._current_index}")
             song = recs[self._current_index].song
@@ -91,3 +72,11 @@ class SongProvider:
             return recs[self._current_index].song
         else:
             return self._songs[interval_index * 5 + self._current_index]
+
+    def _load_songs(self) -> None:
+            try:
+                songs = get_playable_songs(client=self._client)
+            except Exception:
+                songs = []
+                print("Unable to get songs from the database")
+            self._songs = songs

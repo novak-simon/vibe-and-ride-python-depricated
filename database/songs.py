@@ -4,11 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from analysis.model import AudioAnalysis
 from music.model import Song
-from database.methods import _effective_client, _extract_data, _get_table, _execute_query
-
-def _song_from_record(record: dict[str, Any]) -> Song:
-    return Song.from_dict(record)
-
+from database.methods import _effective_client, _extract_data, _get_table, _execute_query, _song_from_record
 
 def get_song_by_jamendo_id(
     jamendo_id: str, client: Any | None = None
@@ -69,21 +65,6 @@ def add_song(song: Song, client: Any | None = None) -> Song:
         raise RuntimeError("Failed to insert song")
 
     return _song_from_record(records[0])
-
-
-def get_songs(
-    limit: int = 100, offset: int = 0, client: Any | None = None
-) -> List[Song]:
-    client = _effective_client(client)
-    response = (
-        client.table("songs")
-        .select("*")
-        .limit(limit)
-        .offset(offset)
-        .execute()
-    )
-    return [_song_from_record(record) for record in _extract_data(response)]
-
 
 def get_playable_songs(client: Any) -> List[Song]:
     query = (

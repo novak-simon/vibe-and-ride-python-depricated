@@ -286,8 +286,8 @@ class WorkoutScheduler:
         duration = interval_info.get("duration")
         if duration is None:
             return []
-        power = _optional_float(interval_info.get("power"))
-        cadence = _optional_float(interval_info.get("cadence"))
+        power = self._optional_float(interval_info.get("power"))
+        cadence = self._optional_float(interval_info.get("cadence"))
         if cadence is None:
             cadence = estimate_cadence_from_power(power)
 
@@ -305,9 +305,9 @@ class WorkoutScheduler:
         repeat = int(attrs.get("Repeat") or 1)
         on_duration = attrs.get("OnDuration")
         off_duration = attrs.get("OffDuration")
-        on_power = _optional_float(attrs.get("OnPower"))
-        off_power = _optional_float(attrs.get("OffPower"))
-        cadence = _optional_float(attrs.get("Cadence"))
+        on_power = self._optional_float(attrs.get("OnPower"))
+        off_power = self._optional_float(attrs.get("OffPower"))
+        cadence = self._optional_float(attrs.get("Cadence"))
 
         intervals: List[Interval] = []
         for _ in range(repeat):

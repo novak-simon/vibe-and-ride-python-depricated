@@ -1,5 +1,6 @@
 from typing import Any, List
 import supabase
+from music.model import Song
 
 def _effective_client(client: Any | None) -> Any:
     return client if client is not None else supabase
@@ -39,3 +40,27 @@ def _execute_query(query):
         raise RuntimeError(f"Supabase error: {error}")
     return data or []
 
+def _is_bike_sport(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    try:
+        return int(value) == 1
+    except (TypeError, ValueError):
+        pass
+    return str(value).strip().lower() in {"bike", "bicycle", "cycling", "true", "yes", "1"}
+
+def _title_exists(title: str, client: Any | None = None) -> bool:
+    client = _effective_client(client)
+    response = (
+        client.table("workouts")
+        .select("id")
+        .eq("title", title)
+        .limit(1)
+        .execute()
+    )
+    return bool(_extract_data(response))
+
+def _song_from_record(record: dict[str, Any]) -> Song:
+    return Song.from_dict(record)

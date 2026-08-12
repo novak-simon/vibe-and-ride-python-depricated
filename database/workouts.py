@@ -1,35 +1,9 @@
-from __future__ import annotations
-
 from typing import Any, List, Optional, TYPE_CHECKING, Union
-from database.methods import _extract_data, _effective_client
 
-import supabase
+from database.methods import _extract_data, _effective_client, _is_bike_sport, _title_exists
 
 if TYPE_CHECKING:
     from workout.parser import ZwoNode
-
-
-def _is_bike_sport(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if value is None:
-        return False
-    try:
-        return int(value) == 1
-    except (TypeError, ValueError):
-        pass
-    return str(value).strip().lower() in {"bike", "bicycle", "cycling", "true", "yes", "1"}
-
-def name_exists(name: str, client: Any | None = None) -> bool:
-    client = _effective_client(client)
-    response = (
-        client.table("workouts")
-        .select("id")
-        .eq("name", name)
-        .limit(1)
-        .execute()
-    )
-    return bool(_extract_data(response))
 
 def upload_parsed_file(parsedFile: Union["ZwoNode", List["ZwoNode"]], client: Any | None = None) -> List[dict[str, Any]]:
     client = _effective_client(client)
@@ -45,14 +19,14 @@ def upload_parsed_file(parsedFile: Union["ZwoNode", List["ZwoNode"]], client: An
     inserted_records = []
     for item in items:
         record = {
-            "name": item.get("children")[1].get("text"),
+            "title": item.get("children")[1].get("text"),
             "author": item.get("children")[0].get("text"),
             "sport_type_is_bike": _is_bike_sport(item.get("children")[3].get("text")),
             "description": item.get("children")[2].get("text"),
             "intervals": item.get("children")[5].get("children"),
         }
 
-        if name_exists(record.get("name"), client=client):
+        if _title_exists(record.get("title"), client=client):
             return
 
         response = (
@@ -74,7 +48,7 @@ def list_workouts(client: Any | None = None) -> List[dict[str, Any]]:
     Return list of workout rows from the 'workouts' table.
     """
     client = _effective_client(client)
-    response = client.table("workouts").select("*").order("name", desc=False).execute()
+    response = client.table("workouts").select("*").order("title", desc=False).execute()
     rows = _extract_data(response)
     return rows or []
 
