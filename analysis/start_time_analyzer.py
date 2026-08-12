@@ -6,4 +6,4 @@ def analyze_for_start_time(librosa_analysis: AudioAnalysis, beatnet_analysis: Au
     Calculates based on audio analysis from Librosa and Beatnet
     TEMPORARILY RETURNS ALWAYS ZERO
     """
-    return 10000
+    return 0
