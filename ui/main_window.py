@@ -51,8 +51,8 @@ class MainWindow(QMainWindow):
         self._load_button = QPushButton("Select workout...")
         self._load_button.clicked.connect(self._load_workout)
 
-        self._workout_name_label = QLabel("No workout loaded")
-        self._workout_name_label.setAlignment(Qt.AlignLeft)
+        self._workout_title_label = QLabel("No workout loaded")
+        self._workout_title_label.setAlignment(Qt.AlignLeft)
 
         self._interval_count_label = QLabel("")
         self._interval_count_label.setAlignment(Qt.AlignLeft)
@@ -94,7 +94,7 @@ class MainWindow(QMainWindow):
 
         layout = QVBoxLayout()
         layout.addWidget(self._load_button)
-        layout.addWidget(self._workout_name_label)
+        layout.addWidget(self._workout_title_label)
         layout.addWidget(self._interval_count_label)
         layout.addWidget(self._interval_label)
         layout.addWidget(self._interval_detail_label)
@@ -127,9 +127,9 @@ class MainWindow(QMainWindow):
         id_map.append(None)
 
         for row in rows:
-            name = row.get("name") or "<unnamed>"
+            title = row.get("title") or "<unnamed>"
             author = row.get("author")
-            display = f"{name}" + (f" — {author}" if author else "")
+            display = f"{title}" + (f" — {author}" if author else "")
             choices.append(display)
             id_map.append(row.get("id"))
 
@@ -173,7 +173,7 @@ class MainWindow(QMainWindow):
                 return
 
         workout = self._controller.get_workout()
-        self._workout_name_label.setText(f"Workout: {workout.name or 'Unnamed'}")
+        self._workout_title_label.setText(f"Workout: {workout.name or 'Unnamed'}")
         self._interval_count_label.setText(f"{len(workout.intervals)} intervals")
         self._refresh_state()
         self._update_controls()
@@ -222,7 +222,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "No workout", "Please load a workout before resynchronizing.")
             return
 
-        total_duration = self._controller.get_workout.total_duration
+        total_duration = self._controller.get_workout().total_duration
         value, ok = QInputDialog.getDouble(
             self,
             "Resynchronize workout",
@@ -250,7 +250,8 @@ class MainWindow(QMainWindow):
             self._status_label.setText("Status: no workout loaded")
             self._update_controls()
             return
-
+        
+        self._controller.refresh_state()
         workout = self._controller.get_workout()
         state = self._controller.get_workout_state()
 
@@ -262,8 +263,6 @@ class MainWindow(QMainWindow):
                 f"Interval {state.interval_index + 1} / {len(workout.intervals) if not workout is None else 0 }"
             )
             self._interval_detail_label.setText(self._format_interval_description(state.current_interval))
-
-        self._controller.refresh_state()
 
         self._song_label.setText(
             f"Song: {self._controller.get_current_song_name() or 'none'}"

@@ -83,6 +83,7 @@ class AppController:
         state = self.get_workout_state()
         if state.status == WorkoutStatus.RUNNING:
             if state.interval_changed:
+                print('Tady bych snad mel byt')
                 self.music_player.next_track(True)
             self.music_player.play()
         elif state.status == WorkoutStatus.PAUSED or state.status == WorkoutStatus.NOT_STARTED:
@@ -100,3 +101,6 @@ class AppController:
             self.scheduler.initialize(path=path)
         else:
             raise ValueError("Couldn't load and prepare workout: Invalid path or workout id")
+
+    def list_available_workouts(self):
+        return list_workouts(self.admin_client)

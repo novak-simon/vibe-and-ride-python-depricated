@@ -31,7 +31,9 @@ class SongProvider:
         return self.choose_song_for_interval(interval_index)
 
     def next_song(self, interval_changed: bool = False) -> Optional[Song]:
+        print("Next Song")
         if interval_changed:
+            print("Interval changed")
             self._current_index = 0
         else:
             self._current_index += 1
@@ -64,11 +66,14 @@ class SongProvider:
         """
         Return the top recommended song for an interval.
         """
-        recs = self._interval_recs[interval_index]
+        if self._interval_recs:
+            recs = self._interval_recs[interval_index]
+        else:
+            recs = []
         if recs:
-            print(f"Song index: {self._current_index}")
+            #print(f"Song index: {self._current_index}")
             song = recs[self._current_index].song
-            print(f"Song: {song.title}, BPM: {song.bpm}, Genre: {song.genre}")
+            #print(f"Song: {song.title}, BPM: {song.bpm}, Genre: {song.genre}")
             return recs[self._current_index].song
         else:
             return self._songs[interval_index * 5 + self._current_index]
