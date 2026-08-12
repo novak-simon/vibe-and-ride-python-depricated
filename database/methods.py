@@ -1,6 +1,7 @@
 from typing import Any, List
 import supabase
 from music.model import Song
+from user.model import User
 
 def _effective_client(client: Any | None) -> Any:
     return client if client is not None else supabase
@@ -64,3 +65,6 @@ def _title_exists(title: str, client: Any | None = None) -> bool:
 
 def _song_from_record(record: dict[str, Any]) -> Song:
     return Song.from_dict(record)
+
+def _user_from_record(record: dict[str, Any]) -> User:
+    return User.from_dict(record)

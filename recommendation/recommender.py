@@ -16,7 +16,6 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any, List, Optional, Sequence
 import logging
-import ast
 
 from workout.model import Interval
 from music.model import Song
@@ -66,10 +65,7 @@ def _get(obj: Any, key: str, default=None):
         return obj.get(key, default)
     return getattr(obj, key, default)
 
-def _genre_to_list(genre):
-    if genre is None:
-        return []
-    return ast.literal_eval(genre)
+
 
 
 # === Cadence resolution ===
@@ -175,7 +171,7 @@ def approximate_filter_by_interval(songs: List[Song], interval: Interval) -> Lis
 def rank_by_user_preference(songs: List[Song], user: User) -> List[Song]:
     return []
 
-def rank_by_interval_match(songs: List[Song], interval: Interval) -> List[Song]:
+def rank_by_interval_match(songs: List[Song], interval: Interval) -> List[Recommendation]:
     return []
 
 # === Recommendation engine ===
@@ -190,7 +186,7 @@ def recommend(interval: Interval, songs: List[Song], limit: int = 10, user_genre
       - rank primarily by bpm_confidence (higher better), then by bpm_difference (lower better), then by song id deterministically
     """
     target_cadence = get_target_cadence(interval)
-    logger.info("Recommendation request: interval=%s => target_cadence=%s", getattr(interval, "__dict__", str(interval)), target)
+    logger.info("Recommendation request: interval=%s => target_cadence=%s", getattr(interval, "__dict__", str(interval)), target_cadence)
 
     if target_cadence is None:
         logger.info("No target cadence could be determined for interval; returning empty recommendations.")
