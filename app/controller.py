@@ -7,19 +7,20 @@ Responsibilities:
 - Create WorkoutScheduler and notify music provider to precompute recommendations
 """
 from __future__ import annotations
+import sys
 from pathlib import Path
 import json
 import logging
 from typing import Optional, List, Any, Union
+from PySide6.QtWidgets import QApplication
 
 from workout.model import Interval, Workout
 from workout.parser import parse_zwo_file
-from workout.scheduler import WorkoutScheduler
+from workout.scheduler import WorkoutScheduler, WorkoutStatus
 from music.player import MusicPlayer
 from database.admin_client import create_admin_supabase
 from recommendation.recommender import estimate_cadence_from_power
-
-# new imports
+from ui.main_window import MainWindow
 from database.workouts import list_workouts, get_workout_by_id
 
 logger = logging.getLogger(__name__)
@@ -33,10 +34,62 @@ def _optional_float(value: Optional[float]) -> Optional[float]:
 
 class AppController:
     def __init__(self):
+        app = QApplication(sys.argv)
+        self._app = app
+
         self.scheduler = WorkoutScheduler(self)
         self.music_player = MusicPlayer(self.scheduler)
         self.music_provider = self._discover_provider()
         self.admin_client = create_admin_supabase()
+
+        window = MainWindow(self)
+        window.show()
+        sys.exit(app.exec())
+
+
+    def get_current_song_name(self) -> str|None:
+        return self.music_player.current_song_name()
+
+    def get_music_player_status(self) -> bool:
+        return self.music_player.available
+
+    def get_audio_output(self):
+        return self.music_player.audio_output
+
+    def is_scheduler_available(self) -> bool:
+        return False if self.scheduler is None else True
+
+    def get_scheduler_state(self):
+        return self.scheduler.get_state()
+
+    def start_workout(self) -> None:
+        self.scheduler.start()
+
+    def get_workout(self):
+        return self.scheduler.workout
+
+    def pause(self):
+        self.scheduler.pause()
+
+    def resume(self):
+        self.scheduler.resume()
+
+    def reset(self):
+        self.scheduler.reset()
+
+    def resync(self, time):
+        self.scheduler.resync(time)
+
+    def refresh_state(self):
+        state = self.get_scheduler_state()
+        if state.status == WorkoutStatus.RUNNING:
+            if state.interval_changed:
+                self.music_player.next_track(True)
+            self.music_player.play()
+        elif state.status == WorkoutStatus.PAUSED or state.status == WorkoutStatus.NOT_STARTED:
+            self.music_player.pause()
+        else:
+            self.music_player.stop()
 
     def _discover_provider(self):
         # keep previous behaviour but defensive: provider may be None

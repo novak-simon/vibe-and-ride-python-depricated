@@ -23,11 +23,6 @@ from workout.parser import parse_zwo_file
 from workout.scheduler import WorkoutScheduler, WorkoutStatus
 
 from .formatting import format_seconds
-from music.player import MusicPlayer
-from database.workouts import upload_parsed_file
-
-# New: use AppController for logic separation
-from app.controller import AppController
 
 logger = logging.getLogger(__name__)
 
@@ -38,13 +33,11 @@ def _optional_float(value: Optional[float]) -> Optional[float]:
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, controller):
         super().__init__()
         self.setWindowTitle("Zwift Music")
         # controller mediates logic (file parsing, scheduler creation, provider precompute)
-        self._controller = AppController()
-        self._scheduler = self._controller.scheduler
-        self._music_player = self._controller.music_player
+        self._controller = controller
         self._build_ui()
 
         self._timer = QTimer(self)
@@ -71,11 +64,11 @@ class MainWindow(QMainWindow):
         self._interval_detail_label.setWordWrap(True)
 
         self._song_label = QLabel(
-            f"Song: {self._music_player.current_song_name() or 'none'}"
+            f"Song: {self._controller.get_current_song_name() or 'none'}"
         )
         self._song_label.setWordWrap(True)
         self._music_status_label = QLabel(
-            f"Music: {'enabled' if self._music_player.available else 'disabled'}"
+            f"Music: {'enabled' if self._controller.get_music_player_status() else 'disabled'}"
         )
         self._interval_time_label = QLabel("Interval time: 00:00 / 00:00")
         self._workout_time_label = QLabel("Workout time: 00:00 / 00:00")
@@ -180,35 +173,35 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Workout load failed", str(exc))
                 return
 
-        workout = self._scheduler.workout
+        workout = self._controller.get_workout()
         self._workout_name_label.setText(f"Workout: {workout.name or 'Unnamed'}")
         self._interval_count_label.setText(f"{len(workout.intervals)} intervals")
         self._refresh_state()
         self._update_controls()
 
     def _start_workout(self) -> None:
-        if self._scheduler is None:
+        if not self._controller.is_scheduler_available():
             QMessageBox.warning(self, "No workout", "Please load a workout before starting.")
             return
 
         # keep UI responsibilities only; start scheduling via scheduler object
-        self._scheduler.start()
+        self._controller.start_workout()
         self._timer.start(200)
         self._refresh_state()
         self._update_controls()
 
     def _toggle_pause_resume(self) -> None:
-        if self._scheduler is None:
+        if not self._controller.is_scheduler_available():
             return
 
-        if self._scheduler.is_running:
+        if self._controller.get_scheduler_state().status is WorkoutStatus.RUNNING:
             try:
-                self._scheduler.pause()
+                self._controller.pause()
             except Exception as exc:
                 QMessageBox.warning(self, "Pause failed", str(exc))
-        elif self._scheduler.is_paused:
+        elif self._controller.get_scheduler_state().status is WorkoutStatus.PAUSED:
             try:
-                self._scheduler.resume()
+                self._controller.resume()
             except Exception as exc:
                 QMessageBox.warning(self, "Resume failed", str(exc))
 
@@ -217,20 +210,20 @@ class MainWindow(QMainWindow):
         self._update_controls()
 
     def _reset_workout(self) -> None:
-        if self._scheduler is None:
+        if not self._controller.is_scheduler_available():
             return
 
-        self._scheduler.reset()
+        self._controller.reset()
         self._timer.start(200)
         self._refresh_state()
         self._update_controls()
 
     def _resync_workout(self) -> None:
-        if self._scheduler is None:
+        if not self._controller.is_scheduler_available():
             QMessageBox.warning(self, "No workout", "Please load a workout before resynchronizing.")
             return
 
-        total_duration = self._scheduler.workout.total_duration
+        total_duration = self._controller.get_workout.total_duration
         value, ok = QInputDialog.getDouble(
             self,
             "Resynchronize workout",
@@ -244,7 +237,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            self._scheduler.resync(value)
+            self._controller.resync(value)
         except Exception as exc:
             QMessageBox.warning(self, "Resync failed", str(exc))
             return
@@ -254,44 +247,38 @@ class MainWindow(QMainWindow):
         self._update_controls()
 
     def _refresh_state(self) -> None:
-        if self._scheduler is None:
+        if not self._controller.is_scheduler_available():
             self._status_label.setText("Status: no workout loaded")
             self._update_controls()
             return
 
-        state = self._scheduler.get_state()
+        workout = self._controller.get_workout()
+        state = self._controller.get_scheduler_state()
 
         if state.interval_index is None:
             self._interval_label.setText("Interval: finished")
             self._interval_detail_label.setText("Workout complete.")
         else:
             self._interval_label.setText(
-                f"Interval {state.interval_index + 1} / {len(self._scheduler.workout.intervals) if not self._scheduler.workout is None else 0 }"
+                f"Interval {state.interval_index + 1} / {len(workout.intervals) if not workout is None else 0 }"
             )
             self._interval_detail_label.setText(self._format_interval_description(state.current_interval))
 
-        if state.status == WorkoutStatus.RUNNING:
-            if state.interval_changed:
-                self._music_player.next_track(True)
-            self._music_player.play()
-        elif state.status == WorkoutStatus.PAUSED or state.status == WorkoutStatus.NOT_STARTED:
-            self._music_player.pause()
-        else:
-            self._music_player.stop()
+        self._controller.refresh_state()
 
         self._song_label.setText(
-            f"Song: {self._music_player.current_song_name() or 'none'}"
+            f"Song: {self._controller.get_current_song_name() or 'none'}"
         )
         self._music_status_label.setText(
             f"Music: {'playing' if state.status == WorkoutStatus.RUNNING else 'paused'}"
-            if self._music_player.available
+            if self._controller.get_music_player_status()
             else "Music: disabled"
         )
         self._interval_time_label.setText(
             f"Interval time: {format_seconds(state.elapsed_in_interval)} / {format_seconds(state.remaining_in_interval)}"
         )
         self._workout_time_label.setText(
-            f"Workout time: {format_seconds(state.total_elapsed)} / {format_seconds(self._scheduler.workout.total_duration if not self._scheduler.workout is None else 0.0)}"
+            f"Workout time: {format_seconds(state.total_elapsed)} / {format_seconds(workout.total_duration if not workout is None else 0.0)}"
         )
 
         status_text = state.status.replace("_", " ").capitalize()
@@ -316,16 +303,17 @@ class MainWindow(QMainWindow):
         return " · ".join(parts)
 
     def _update_controls(self) -> None:
-        has_workout = self._scheduler is not None
+        has_workout = self._controller.is_scheduler_available()
+        status = self._controller.get_scheduler_state().status
         self._load_button.setEnabled(True)
-        self._start_button.setEnabled(has_workout and self._scheduler.status == WorkoutStatus.NOT_STARTED)
+        self._start_button.setEnabled(has_workout and status is WorkoutStatus.NOT_STARTED)
         if not has_workout:
             self._pause_button.setEnabled(False)
             self._pause_button.setText("Pause")
-        elif self._scheduler.is_running:
+        elif status is WorkoutStatus.RUNNING:
             self._pause_button.setEnabled(True)
             self._pause_button.setText("Pause")
-        elif self._scheduler.is_paused:
+        elif status is WorkoutStatus.PAUSED:
             self._pause_button.setEnabled(True)
             self._pause_button.setText("Resume")
         else:
@@ -334,10 +322,10 @@ class MainWindow(QMainWindow):
 
         self._reset_button.setEnabled(has_workout)
         self._resync_button.setEnabled(has_workout)
-
-        if self._music_player.available and self._music_player.audio_output is not None:
-            self._music_player.audio_output.setVolume(1.0)
-            self._music_player.audio_output.setMuted(False)
+        audio_output = self._controller.get_audio_output()
+        if self._controller.get_music_player_status() and audio_output is not None:
+            audio_output.setVolume(1.0)
+            audio_output.setMuted(False)
 
     def _on_media_status_changed(self, status) -> None:
         logger.info("Media status changed: %s", status)
