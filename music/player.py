@@ -28,6 +28,7 @@ class MusicPlayer:
         self._audio_output = None
         self._provider = SongProvider(scheduler=scheduler)
         self._songs = self._provider._songs
+        self._current_song = None
         self._debug_info = ""
         self._backend_error = _PYSIDE6_MULTIMEDIA_ERROR
         self._backend_available = (
@@ -109,6 +110,7 @@ class MusicPlayer:
         return None if self._provider is None else self._provider
 
     def _set_current_source(self, song: Song = None) -> None:
+
         if song is None:
             song = self._provider.get_current_song()
         if song is None or song.audio_url is None or QUrl is None:
@@ -118,9 +120,10 @@ class MusicPlayer:
             source = QUrl(song.audio_url)
         else:
             source = QUrl.fromLocalFile(song.audio_url)
-
+        self._current_song = song
         if hasattr(self._player, "setSource"):
             self._player.setSource(source)
+            self._player.setPosition(song.start_time)
 
     def current_song_name(self) -> Optional[str]:
         song = self._provider.get_current_song()
@@ -155,6 +158,12 @@ class MusicPlayer:
 
     def _on_media_status_changed(self, status) -> None:
         logger.info("Media status changed: %s", status)
+        if status is QMediaPlayer.MediaStatus.LoadedMedia:
+            print("Loaded Media")
+            print(f"Song: {self._current_song}")
+            print(f"Start time planned: {self._current_song.start_time}")
+            self._player.setPosition(self._current_song.start_time)
+            print(f"Position {self._player.position()}")
         if self._end_of_media_status is not None and status == self._end_of_media_status:
             self.next_track()
 

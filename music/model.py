@@ -18,6 +18,7 @@ class Song:
     audio_url: Optional[str] = None
     download_url: Optional[str] = None
     beat_intervals: Optional[List[float]] = None
+    start_time: int = 0
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Song":
@@ -33,6 +34,7 @@ class Song:
             audio_url=_optional_str(data.get("audio_url")),
             download_url=_optional_str(data.get("download_url")),
             beat_intervals=_optional_float_list(data.get("beat_intervals")),
+            start_time=_optional_int(data.get("start_time"))
         )
 
     def to_record(self) -> Dict[str, Any]:
@@ -47,6 +49,7 @@ class Song:
             "audio_url": self.audio_url,
             "download_url": self.download_url,
             "beat_intervals": self.beat_intervals,
+            "start_time": self.start_time,
         }
 
 
