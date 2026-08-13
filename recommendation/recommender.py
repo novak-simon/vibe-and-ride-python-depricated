@@ -16,13 +16,16 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any, List, Optional, Sequence
 import logging
+from datetime import timedelta
 
 from workout.model import Interval, Workout
 from music.model import Song
 from user.model import User
 from user.service import getCurrentUser
 from database.songs import get_songs_around_target, fetch_songs
+from database.user_song_stats import get_stat_by_user_and_song_id
 from database.admin_client import create_admin_supabase
+from helper_methods.model_methods import current_timestampz
 
 
 
@@ -141,7 +144,6 @@ def get_algorithm_cadence(cadence: int) -> int:
 
 # === Parts of Recommendation engine ===
 FIRST_CANDIDATE_POOL_LIMIT = 300
-SECOND_CANDIDATE_POOL_LIMIT = 50
 THIRD_CANDIDATE_POOL_LIMIT = 10
 
 
@@ -161,52 +163,112 @@ def approximate_filter_by_interval(interval: Interval) -> List[Song]:
             return pool
 
 
-def rank_by_user_preference(songs: List[Song], user: User) -> List[Song]:
-    """Filter songs by user genre preference."""
-    if user is None or not songs:
-        return songs
-    return [s for s in songs if song_matches_user_genres(s, user.genres if hasattr(user, 'genres') else USER_GENRES)]
+def rank_song_by_user_preference(song: Song, user: User) -> int:
+    """Ranks songs by user preferences and user_song_stats."""
+    if user is None or not song:
+        return 0
+    number_of_matching_genres = len(set(song.genre) & set(user.genre_preferences))
+    stat = get_stat_by_user_and_song_id(user.id, song.id, admin_client)
+    since_last_played = current_timestampz() - stat.last_played_at
+    if since_last_played < timedelta(hours=1):
+        return 0
+    else:
+        repetition_coefficient = min(2, since_last_played/timedelta(days=2))
+    like_coefficient = 2 if stat.is_liked is True else 1
+    if not stat.skip_count == 0:
+        skip_coefficient = min(2, stat.play_count/3*stat.skip_count)
+    else:
+        skip_coefficient = 2
+    score = number_of_matching_genres * repetition_coefficient * like_coefficient * skip_coefficient
+    return score
 
 
-def rank_by_interval_match(songs: List[Song], interval: Interval) -> List[Recommendation]:
-    """Rank songs by BPM compatibility with interval target cadence."""
-    if not songs or interval.cadence is None:
+def rank_by_interval_match(songs: List[Song], interval: Interval) -> List[Song]:
+    """
+    Rank songs for a workout interval and return up to THIRD_CANDIDATE_POOL_LIMIT songs.
+
+    Ranking signals:
+    - Cadence fit (strongest): uses BPM half/double matching + algorithm_cadence
+    - Power fit: compares interval power (scaled to 0-100) with song.algorithm_power
+    - BPM confidence: prefers more reliable BPM estimates
+    """
+    if not songs or interval is None:
         return []
-    
-    recommendations = []
+
+    target_cadence = _get(interval, "cadence", None)
+    target_power = _get(interval, "power", None)
+    target_algorithm_power = (float(target_power) * 100.0) if target_power is not None else None
+
+    def _clamp01(x: float) -> float:
+        if x < 0.0:
+            return 0.0
+        if x > 1.0:
+            return 1.0
+        return x
+
+    ranked = []
+
     for song in songs:
         sbpm = _get(song, "bpm", None)
-        if sbpm is None:
-            continue
-        match = calculate_bpm_match(sbpm, interval.cadence)
-        if not match.compatible:
-            continue
-        conf = _get(song, "bpm_confidence", None)
-        recommendations.append((song, sbpm, conf, match))
-    
-    # Sort by confidence (desc), then by BPM difference (asc), then by song id
-    def sort_key(entry):
-        s, sbpm, conf, match = entry
-        has_conf = 1 if conf is not None else 0
-        conf_val = float(conf) if conf is not None else 0.0
-        diff_val = float(match.difference) if match.difference is not None else float("inf")
-        sid = _get(s, "id", None) or str(s)
-        return (-has_conf, -conf_val, diff_val, str(sid))
-    
-    recommendations.sort(key=sort_key)
-    
-    return [
-        Recommendation(
-            song=s,
-            song_bpm=float(sbpm) if sbpm is not None else None,
-            bpm_confidence=float(conf) if conf is not None else None,
-            target_cadence=interval.cadence,
-            effective_bpm=match.effective_bpm,
-            bpm_difference=match.difference,
-            tempo_multiplier=match.multiplier,
+        bpm_conf = _get(song, "bpm_confidence", 0) or 0
+        song_alg_cad = _get(song, "algorithm_cadence", None)
+        song_alg_pow = _get(song, "algorithm_power", None)
+
+        cadence_diff = float("inf")
+        cadence_score = 0.0
+        cadence_compatible_bonus = 0.0
+
+        # 1) Cadence fit: best of BPM-based matching and algorithm_cadence
+        if target_cadence is not None:
+            candidate_diffs = []
+
+            if sbpm not in (None, 0):
+                match = calculate_bpm_match(sbpm, target_cadence)
+                if match.difference is not None:
+                    candidate_diffs.append(float(match.difference))
+                    if match.compatible:
+                        cadence_compatible_bonus = 0.15
+
+            if song_alg_cad not in (None, 0):
+                candidate_diffs.append(abs(float(song_alg_cad) - float(target_cadence)))
+
+            if candidate_diffs:
+                cadence_diff = min(candidate_diffs)
+                # Soft decay: full score near 0 diff, fades toward 0 at ~30 BPM diff
+                cadence_score = _clamp01(1.0 - (cadence_diff / 30.0))
+            else:
+                cadence_score = 0.0
+        else:
+            # No cadence in interval -> neutral cadence contribution
+            cadence_score = 0.4
+            cadence_diff = 9999.0
+
+        # 2) Power fit (optional)
+        power_diff = float("inf")
+        power_score = 0.0
+        if target_algorithm_power is not None and song_alg_pow is not None:
+            power_diff = abs(float(song_alg_pow) - float(target_algorithm_power))
+            # Soft decay: fades toward 0 at ~80 power points
+            power_score = _clamp01(1.0 - (power_diff / 80.0))
+
+        # 3) BPM confidence (optional)
+        conf_score = _clamp01(float(bpm_conf) / 100.0)
+
+        # Weighted total score
+        total_score = (
+            0.70 * cadence_score +
+            0.00 * power_score +    #TEMPORARILY SET TO 0, WAITING FOR COMPLETE SONG ANALYSIS MODULE
+            0.30 * conf_score +
+            cadence_compatible_bonus
         )
-        for s, sbpm, conf, match in recommendations
-    ]
+
+        sid = _get(song, "id", None)
+        ranked.append((song, total_score, cadence_diff, power_diff, -conf_score, str(sid)))
+
+    # Higher total score first, then tighter cadence, tighter power, higher confidence, stable id tie-break
+    ranked.sort(key=lambda x: (-x[1], x[2], x[3], x[4], x[5]))
+
+    return [row[0] for row in ranked[:THIRD_CANDIDATE_POOL_LIMIT]]
 
 
 # === Recommendation engine ===
@@ -218,16 +280,16 @@ def recommend(workout: Workout) -> List[List[Song]]:
     if intervals is None:
         return []
     user = getCurrentUser()
-    first_candidate_pool = []
-    existing_ids = []
-    for idx, interval in enumerate(intervals):
+    candidate_pool = []
+    existing_ids = set()
+    for interval in intervals:
         pool = approximate_filter_by_interval(interval)
         for song in pool:
             if song.id not in existing_ids:
-                first_candidate_pool.append(song)
+                candidate_pool.append(song)
                 existing_ids.add(song.id)
-
-    second_candidate_pool = rank_by_user_preference(first_candidate_pool, user)
-    third_candidate_pool = rank_by_interval_match(second_candidate_pool, interval)
-    
-    return third_candidate_pool
+    candidate_pool.sort(key=lambda song: rank_song_by_user_preference(song, user), reverse=True)
+    interval_recs = []
+    for interval in intervals:
+        interval_recs.append(rank_by_interval_match(candidate_pool, interval))
+    return interval_recs
