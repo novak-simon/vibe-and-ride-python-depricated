@@ -197,11 +197,20 @@ def rank_by_interval_match(songs: List[Song], intervals: List[Interval]) -> List
         return []
 
     def _clamp01(x: float) -> float:
+            """Returns value clamped between 0 and 1."""
             if x < 0.0:
                 return 0.0
-            if x > 1.0:
+            elif x > 1.0:
                 return 1.0
             return x
+
+    def _clamp02(x: float) -> float:
+        """Returns value clamped between -1 and 1."""
+        if x < -1.0:
+            return -1.0
+        elif x > 1.0:
+            return 1.0
+        return x
     
     interval_scores = []
     for interval in intervals:
@@ -263,23 +272,76 @@ def rank_by_interval_match(songs: List[Song], intervals: List[Interval]) -> List
             # 3) BPM confidence (optional)
             conf_score = _clamp01(float(bpm_conf) / 100.0)
 
-            # 3) Song score (optional)
-            song_score = 0
-            if "energetic" in song.vartags:
-                song_score += 0.5
-            if "drums" in song.instruments:
-                song_score += 0.1
-            if "peaceful" in song.vartags:
-                song_score -= 0.1
-            if "ambient" in song.genre or "ambientdub" in song.genre or "drone" in song.genre:
-                song_score -= 1.0
+            # 4) Song score (optional)
+            TAG_WEIGHTS = {
+                "energetic": 0.5,
+                "motivational": 0.5,
+                "upbeat": 0.3,
+                "radio": 0.3,
+                "groovy": 0.2,
+                "powerful": 0.2,
+                "beachmusic": 0.2,
+                "handclaps": 0.2,
+                "fast": 0.2,
+                "epic": 0.1,
+                "uplifting": 0.1,
+                "upliftingrock": 0.1,
+                "agressive": 0.1,
+                "happy": 0.1,
+                "cheerful": 0.1,
+                "party": 0.1,
+                "summer": 0.05,
+                "popular": 0.05,
+                "drumkit": 0.1,
+                "lounge": -0.1,
+                "film": -0.1,
+                "filmscore": -0.1,
+                "soft": -0.1,
+                "ballad": -0.1,
+                "melancholic": -0.1,
+                "peaceful": -0.2,
+                "cinematic": -0.2,
+                "peace": -0.2,
+                "chilloutmusic": -0.2,
+                "chill": -0.2,
+                "relaxing": -0.2,
+                "mystery": -0.2,
+                "sad": -0.3,
+                "lonely": -0.3,
+                "dark": -0.3,
+                "podcast": -0.3,
+                "calm": -0.3,
+                "atmospheric": -0.3,
+                "soundscape": -0.5,
+                "introspective": -0.5,
+                "ambient": -1,
+                "ambientdub": -1,
+                "drone": -1,
+            }
+            INSTRUMENT_WEIGHTS = {
+                "drums": 0.1,
+                "drummachine": 0.1,
+                "bass": 0.1,
+                "electricguitar": 0.05,
+                "electroamplified": 0.05,
+                "synthesizer": 0.05,
+            }
+            GENRE_WEIGHTS = {
+                "ambient": -1,
+                "ambientdub": -1,
+                "drone": -1,
+            }
+            tag_score = sum(TAG_WEIGHTS.get(t, 0) for t in song.vartags)
+            instrument_score = sum(INSTRUMENT_WEIGHTS.get(i, 0) for i in song.instruments)
+            genre_score = sum(GENRE_WEIGHTS.get(t, 0) for t in song.genre)
+            song_score = _clamp02(tag_score + instrument_score + genre_score)   #Can be negative
 
             # Weighted total score
             total_score = (
                 0.80 * cadence_score +
                 0.00 * power_score +    #TEMPORARILY SET TO 0, WAITING FOR COMPLETE SONG ANALYSIS MODULE
                 0.20 * conf_score +
-                0.20 * song_score +
+                0.30 * song_score +
                 cadence_compatible_bonus
             )
 
