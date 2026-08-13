@@ -1,6 +1,7 @@
 from typing import Any, Optional, List
 import ast
 import json
+from datetime import datetime, timezone
 
 def _optional_str(value: Any) -> Optional[str]:
     if value is None:
@@ -65,3 +66,6 @@ def estimate_cadence_from_power(power: float, interval_context: Optional[Any] = 
         return 80 #Default cadence value if there is literally no information
     cadence = max(75, min(115, 70 + 30 * p))
     return cadence
+
+def current_timestampz() -> datetime:
+    return datetime.now(timezone.utc)

@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
+from datetime import datetime, timezone
 
-from helper_methods.model_methods import _optional_str, _optional_int_or_none, _optional_int, _optional_float_list, _str_to_list
+from helper_methods.model_methods import _optional_str, _optional_int_or_none, _optional_int, _optional_float_list, _str_to_list, current_timestampz
 
 @dataclass(frozen=True)
 class User:
@@ -21,4 +22,45 @@ class User:
         return {
             "name": self.name,
             "genre_preferences": self.genre_preferences,
+        }
+
+@dataclass(frozen=True)
+class UserSongStats:
+    id: int = 0
+    song_id: int = 0
+    user_id: int = 0
+    is_liked: bool = False
+    play_count: int = 0
+    skip_count: int = 0
+    first_played_at: datetime = current_timestampz()
+    last_played_at: datetime = current_timestampz()
+    last_skipped_at: datetime = None
+    total_play_time: int = 0
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "UserSongStats":
+        return cls(
+            id=_optional_int_or_none(data.get("id")),
+            song_id=_optional_int_or_none(data.get("song_id")),
+            user_id=_optional_int_or_none(data.get("user_id")),
+            is_liked=bool(data.get("is_liked")),
+            play_count=_optional_int(data.get("play_count")),
+            skip_count=_optional_int(data.get("skip_count")),
+            first_played_at=datetime.fromisoformat(data.get("first_played_at")),
+            last_played_at=datetime.fromisoformat(data.get("last_played_at")),
+            last_skipped_at=datetime.fromisoformat(data.get("last_skipped_at")),
+            total_play_time=_optional_int(data.get("total_play_time")),
+        )
+
+    def to_record(self) -> Dict[str, Any]:
+        return {
+            "song_id": self.song_id,
+            "user_id": self.user_id,
+            "is_liked": self.is_liked,
+            "play_count": self.play_count,
+            "skip_count": self.skip_count,
+            "first_played_at": self.first_played_at.isoformat() if self.first_played_at else None,
+            "last_played_at": self.last_played_at.isoformat() if self.last_played_at else None,
+            "last_skipped_at": self.last_skipped_at.isoformat() if self.last_skipped_at else None,
+            "total_play_time": self.total_play_time,
         }

@@ -17,7 +17,7 @@ from types import SimpleNamespace
 from typing import Any, List, Optional, Sequence
 import logging
 
-from workout.model import Interval
+from workout.model import Interval, Workout
 from music.model import Song
 from user.model import User
 from user.service import getCurrentUser
@@ -140,19 +140,24 @@ def get_algorithm_cadence(cadence: int) -> int:
 
 
 # === Parts of Recommendation engine ===
+FIRST_CANDIDATE_POOL_LIMIT = 300
+SECOND_CANDIDATE_POOL_LIMIT = 50
+THIRD_CANDIDATE_POOL_LIMIT = 10
+
+
 def approximate_filter_by_interval(interval: Interval) -> List[Song]:
     print(f"Power: {interval.power}, Cadence: {interval.cadence}")
     interval_algorithm_cadence = get_algorithm_cadence(interval.cadence)
     interval_algorithm_power = interval.power*100 if not interval.power is None else 60
-    pool = get_songs_around_target(admin_client, interval_algorithm_cadence, interval_algorithm_power, limit=10, algorithm_power_toleration=50) #Temporarily set to 50
+    pool = get_songs_around_target(admin_client, interval_algorithm_cadence, interval_algorithm_power, algorithm_cadence_toleration=5, algorithm_power_toleration=50, limit=FIRST_CANDIDATE_POOL_LIMIT) #Temporarily set to 50
     if pool:
         return pool
     else:   #Try to get songs that don't match that well, if it fails, gets at least some songs
-        pool = get_songs_around_target(admin_client, interval_algorithm_cadence, interval_algorithm_power, 10, 0.2, limit=10)
+        pool = get_songs_around_target(admin_client, interval_algorithm_cadence, interval_algorithm_power, 10, 20, limit=FIRST_CANDIDATE_POOL_LIMIT)
         if pool:
             return pool
         else:
-            pool = fetch_songs(admin_client)
+            pool = fetch_songs(admin_client, limit=FIRST_CANDIDATE_POOL_LIMIT)
             return pool
 
 
@@ -205,20 +210,24 @@ def rank_by_interval_match(songs: List[Song], interval: Interval) -> List[Recomm
 
 
 # === Recommendation engine ===
-def recommend(interval: Interval, limit: int = 10, user_genres: Sequence[str] = USER_GENRES) -> List[Recommendation]:
+def recommend(workout: Workout) -> List[List[Song]]:
     """
     Recommend a ranked list of songs for a given workout interval.
     """
-    target_cadence = interval.cadence
-    logger.info("Recommendation request: interval=%s => target_cadence=%s", getattr(interval, "__dict__", str(interval)), target_cadence)
-
-    if target_cadence is None:
-        logger.info("No target cadence could be determined for interval; returning empty recommendations.")
+    intervals = workout.intervals
+    if intervals is None:
         return []
-    
     user = getCurrentUser()
-    first_candidate_pool = approximate_filter_by_interval(interval)
+    first_candidate_pool = []
+    existing_ids = []
+    for idx, interval in enumerate(intervals):
+        pool = approximate_filter_by_interval(interval)
+        for song in pool:
+            if song.id not in existing_ids:
+                first_candidate_pool.append(song)
+                existing_ids.add(song.id)
+
     second_candidate_pool = rank_by_user_preference(first_candidate_pool, user)
     third_candidate_pool = rank_by_interval_match(second_candidate_pool, interval)
     
-    return third_candidate_pool[:limit]
+    return third_candidate_pool

@@ -10,8 +10,6 @@ from music.model import Song
 from recommendation.recommender import recommend, Recommendation  # new dependency
 
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".ogg", ".flac", ".m4a"}
-RECOMMENDER_CANDIDATE_POOL = 200
-RECOMMENDER_LIMIT_PER_INTERVAL = 10
 
 
 class SongProvider:
@@ -50,14 +48,10 @@ class SongProvider:
         Safe to call multiple times; will overwrite previous cache for this provider instance.
         """
         try:
-            intervals = workout.intervals
-            if not intervals:
+            if not workout:
                 self._interval_recs = {}
                 return
-            self._interval_recs = {}
-            for idx, interval in enumerate(intervals):
-                recs = recommend(interval, limit=RECOMMENDER_LIMIT_PER_INTERVAL)
-                self._interval_recs[idx] = recs
+            self._interval_recs = recommend(workout)
         except Exception:
             # never crash the host when precomputing; log and continue
             import logging
