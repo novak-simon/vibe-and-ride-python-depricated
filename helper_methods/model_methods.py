@@ -14,6 +14,11 @@ def _optional_int(value: Any, default: int = 0) -> int:
         return default
     return int(value)
 
+def _optional_float(value: Any, default: float = 0) -> float:
+    if value is None:
+        return default
+    return float(value)
+
 
 def _optional_int_or_none(value: Any) -> Optional[int]:
     if value is None:

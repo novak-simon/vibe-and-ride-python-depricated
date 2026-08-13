@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from helper_methods.model_methods import _optional_float_list, _optional_int, _optional_int_or_none, _optional_str, _str_to_list, _str_to_dict
+from helper_methods.model_methods import _optional_float_list, _optional_int, _optional_int_or_none, _optional_str, _str_to_list, _str_to_dict, _optional_float
 
 @dataclass(frozen=True)
 class Song:
@@ -22,7 +22,7 @@ class Song:
     audio_url: Optional[str] = None
     download_url: Optional[str] = None
     beat_intervals: Optional[List[float]] = None
-    start_time: int = 0
+    start_time: float = 0
     algorithm_cadence: int = 0
     algorithm_power: int = 60
     waveform: List[int] = None
@@ -51,7 +51,7 @@ class Song:
             audio_url=_optional_str(data.get("audio_url")),
             download_url=_optional_str(data.get("download_url")),
             beat_intervals=_optional_float_list(data.get("beat_intervals")),
-            start_time=_optional_int(data.get("start_time")),
+            start_time=_optional_float(data.get("start_time")),
             algorithm_cadence=_optional_int(data.get("algorithm_cadence")),
             algorithm_power=_optional_int(data.get("algorithm_power"), default=60),
             waveform=_str_to_list(data.get("waveform")),

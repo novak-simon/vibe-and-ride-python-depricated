@@ -10,6 +10,8 @@ class StartTimeAnalyzer:
         """
         if not song.waveform:
             return 0
+
+        # Groups waveforms into groups of 10 (approximately 2 seconds) and for each group takes the average waveform
         values_10 = []
         temp = set()
         i = 0
@@ -23,10 +25,7 @@ class StartTimeAnalyzer:
                 values_10.append((round(mean(temp)), round(length_10/10*i, 1)))
                 temp.clear()
             
-
-
-        print(values_10)
-
+        # Goes through grouped values and compares each value to the average of the current forming group, when too distinct, adds current forming group to new list and starts forming new group
         values_blocks = []
         for j in range(len(values_10)):
             if not temp:
@@ -38,7 +37,8 @@ class StartTimeAnalyzer:
             else:
                 values_blocks.append((round(mean([val[0] for val in temp])), round(j*length_10, 1)))
                 temp.clear()
-        print(values_blocks)
+
+        # Takes the first block that is <60 and isn't the begining silence (defined as <10) also checks if it isn't too far in the song
         alt_val = None
         for val in values_blocks:
             if val[0] < 10:

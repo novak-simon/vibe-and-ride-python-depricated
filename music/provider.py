@@ -63,13 +63,11 @@ class SongProvider:
         """
         if self._interval_recs:
             recs = self._interval_recs[interval_index]
-            print(f"Number of recs: {len(recs)}")
         else:
             recs = []
         if recs:
-            print(f"Song index: {self._current_index}")
             song = recs[self._current_index]
-            print(f"Song: {song.title}, ID: {song.id}, BPM: {song.bpm}, Genre: {song.genre}")
+            #print(f"Song: {song.title}, ID: {song.id}, BPM: {song.bpm}, Genre: {song.genre}, Start time: {song.start_time}")
             return recs[self._current_index]
         else:
             return self._songs[interval_index * 5 + self._current_index]

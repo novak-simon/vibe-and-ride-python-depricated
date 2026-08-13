@@ -35,7 +35,7 @@ def _optional_float(value: Optional[float]) -> Optional[float]:
 class MainWindow(QMainWindow):
     def __init__(self, controller):
         super().__init__()
-        self.setWindowTitle("Zwift Music")
+        self.setWindowTitle("Music4Zwift")
         # controller mediates logic (file parsing, scheduler creation, provider precompute)
         self._controller = controller
         self._build_ui()
@@ -114,6 +114,7 @@ class MainWindow(QMainWindow):
         - Show a simple chooser with workouts from DB (default).
         - Provide "Import my own workout..." option which falls back to file picker and existing import flow.
         """
+        self._workout_title_label.setText("Loading workout...")
         try:
             rows = self._controller.list_available_workouts()
         except Exception as exc:

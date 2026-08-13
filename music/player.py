@@ -123,7 +123,6 @@ class MusicPlayer:
         self._current_song = song
         if hasattr(self._player, "setSource"):
             self._player.setSource(source)
-            self._player.setPosition(song.start_time)
 
     def current_song_name(self) -> Optional[str]:
         song = self._provider.get_current_song()
@@ -160,8 +159,9 @@ class MusicPlayer:
         logger.info("Media status changed: %s", status)
         if status is QMediaPlayer.MediaStatus.LoadedMedia:
             print("Loaded Media")
+            print(f"Song: {self._current_song.title}, ID: {self._current_song.id}, BPM: {self._current_song.bpm}, Genre: {self._current_song.genre}, Start time: {self._current_song.start_time}")
             print(f"Start time planned: {self._current_song.start_time}")
-            self._player.setPosition(self._current_song.start_time)
+            self._player.setPosition(int(self._current_song.start_time * 1000))
             print(f"Position {self._player.position()}")
         if self._end_of_media_status is not None and status == self._end_of_media_status:
             self.next_track()
