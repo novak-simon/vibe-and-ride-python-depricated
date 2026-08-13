@@ -228,7 +228,9 @@ def approximate_filter_by_interval(interval: Interval) -> List[Song]:
             pool = fetch_songs(admin_client, limit=FIRST_CANDIDATE_POOL_LIMIT)
             return pool
 
-
+# Currently not in use, rank_song_by_user_preference_with_details is in use due to debug
+# Will be probably reused later when optimization will take plaec
+# !!! IT IS PROBABLY NOT UP TO DATE !!!
 def rank_song_by_user_preference(song: Song, user: User) -> int:
     """Ranks songs by user preferences and user_song_stats."""
     if user is None or not song:
@@ -626,13 +628,6 @@ def _rank_user_preference_with_details(song: Song, user: User) -> tuple[float, D
         score = number_of_matching_genres * 8.1
 
     return float(score), details
-
-
-def rank_song_by_user_preference(song: Song, user: User) -> int:
-    """Ranks songs by user preferences and user_song_stats."""
-    score, _ = _rank_user_preference_with_details(song, user)
-    return score
-
 
 # === Recommendation engine ===
 def recommend(workout: Workout) -> List[List[Song]]:
