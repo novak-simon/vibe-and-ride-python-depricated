@@ -13,7 +13,7 @@ def _extract_data(response: Any) -> List[dict[str, Any]]:
         data = getattr(response, "data", None)
 
     if data is None:
-        raise RuntimeError("Unexpected Supabase response: missing data")
+        data = [{}]
 
     if isinstance(data, list):
         return data

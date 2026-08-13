@@ -17,7 +17,7 @@ class SongProvider:
         self._client = client or supabase
         self._songs: List[Song] = []
         self._current_index = -1
-        self._interval_recs = {}  # type: dict[int, list]
+        self._interval_recs = []
         self.scheduler: WorkoutScheduler = scheduler
         self._load_songs()
 
@@ -49,7 +49,7 @@ class SongProvider:
         """
         try:
             if not workout:
-                self._interval_recs = {}
+                self._interval_recs = []
                 return
             self._interval_recs = recommend(workout)
         except Exception:
@@ -68,9 +68,9 @@ class SongProvider:
             recs = []
         if recs:
             print(f"Song index: {self._current_index}")
-            song = recs[self._current_index].song
+            song = recs[self._current_index]
             print(f"Song: {song.title}, ID: {song.id}, BPM: {song.bpm}, Genre: {song.genre}")
-            return recs[self._current_index].song
+            return recs[self._current_index]
         else:
             return self._songs[interval_index * 5 + self._current_index]
 

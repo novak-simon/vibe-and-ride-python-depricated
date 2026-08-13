@@ -167,19 +167,22 @@ def rank_song_by_user_preference(song: Song, user: User) -> int:
     """Ranks songs by user preferences and user_song_stats."""
     if user is None or not song:
         return 0
-    number_of_matching_genres = len(set(song.genre) & set(user.genre_preferences))
+    number_of_matching_genres: float = len(set(song.genre) & set(user.genre_preferences)) if song.genre else 0.5
     stat = get_stat_by_user_and_song_id(user.id, song.id, admin_client)
-    since_last_played = current_timestampz() - stat.last_played_at
-    if since_last_played < timedelta(hours=1):
-        return 0
+    if stat:
+        since_last_played = current_timestampz() - stat.last_played_at
+        if since_last_played < timedelta(hours=1):
+            return 0
+        else:
+            repetition_coefficient = min(2, since_last_played/timedelta(days=2))
+        like_coefficient = 2 if stat.is_liked is True else 1
+        if not stat.skip_count == 0:
+            skip_coefficient = min(2, stat.play_count/3*stat.skip_count)
+        else:
+            skip_coefficient = 2
+        score = number_of_matching_genres * repetition_coefficient * like_coefficient * skip_coefficient
     else:
-        repetition_coefficient = min(2, since_last_played/timedelta(days=2))
-    like_coefficient = 2 if stat.is_liked is True else 1
-    if not stat.skip_count == 0:
-        skip_coefficient = min(2, stat.play_count/3*stat.skip_count)
-    else:
-        skip_coefficient = 2
-    score = number_of_matching_genres * repetition_coefficient * like_coefficient * skip_coefficient
+        score = number_of_matching_genres * 8.1
     return score
 
 
@@ -256,9 +259,9 @@ def rank_by_interval_match(songs: List[Song], interval: Interval) -> List[Song]:
 
         # Weighted total score
         total_score = (
-            0.70 * cadence_score +
+            0.80 * cadence_score +
             0.00 * power_score +    #TEMPORARILY SET TO 0, WAITING FOR COMPLETE SONG ANALYSIS MODULE
-            0.30 * conf_score +
+            0.20 * conf_score +
             cadence_compatible_bonus
         )
 
@@ -288,6 +291,7 @@ def recommend(workout: Workout) -> List[List[Song]]:
             if song.id not in existing_ids:
                 candidate_pool.append(song)
                 existing_ids.add(song.id)
+    print(f"Initial candidate pool length: {len(candidate_pool)}")
     candidate_pool.sort(key=lambda song: rank_song_by_user_preference(song, user), reverse=True)
     interval_recs = []
     for interval in intervals:
