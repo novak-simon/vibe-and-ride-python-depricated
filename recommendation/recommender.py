@@ -144,6 +144,7 @@ def get_algorithm_cadence(cadence: int) -> int:
 
 # === Parts of Recommendation engine ===
 FIRST_CANDIDATE_POOL_LIMIT = 300
+SECOND_CANDIDATE_POOL_LIMIT = 100
 THIRD_CANDIDATE_POOL_LIMIT = 10
 
 
@@ -257,11 +258,25 @@ def rank_by_interval_match(songs: List[Song], interval: Interval) -> List[Song]:
         # 3) BPM confidence (optional)
         conf_score = _clamp01(float(bpm_conf) / 100.0)
 
+        # 3) Song score (optional)
+        song_score = 0
+        if "energetic" in song.vartags:
+            song_score += 0.5
+        if "drums" in song.instruments:
+            song_score += 0.1
+        if "peaceful" in song.vartags:
+            song_score -= 0.1
+        if "ambient" in song.genre or "ambientdub" in song.genre or "drone" in song.genre:
+            song_score -= 1.0
+
+
+
         # Weighted total score
         total_score = (
             0.80 * cadence_score +
             0.00 * power_score +    #TEMPORARILY SET TO 0, WAITING FOR COMPLETE SONG ANALYSIS MODULE
             0.20 * conf_score +
+            0.20 * song_score +
             cadence_compatible_bonus
         )
 
@@ -295,5 +310,5 @@ def recommend(workout: Workout) -> List[List[Song]]:
     candidate_pool.sort(key=lambda song: rank_song_by_user_preference(song, user), reverse=True)
     interval_recs = []
     for interval in intervals:
-        interval_recs.append(rank_by_interval_match(candidate_pool, interval))
+        interval_recs.append(rank_by_interval_match(candidate_pool[:SECOND_CANDIDATE_POOL_LIMIT], interval))
     return interval_recs
