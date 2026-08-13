@@ -368,54 +368,77 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def _format_interval_debug_text(self, info: dict) -> str:
+        def _fmt(v):
+            return "-" if v is None else str(v)
+
+        def _fmt4(v):
+            try:
+                return f"{float(v):.4f}"
+            except Exception:
+                return "-"
+
         lines = []
 
         lines.append("WORKOUT / INTERVAL")
-        lines.append(f"- Interval: {info.get('interval_identifier') or info.get('interval_index')}")
-        lines.append(f"- Type: {info.get('interval_type')}")
-        lines.append(f"- Duration: {info.get('duration')}")
-        lines.append(f"- Target cadence: {info.get('target_cadence')}")
-        lines.append(f"- Cadence source: {info.get('cadence_source')}")
-        lines.append(f"- Target power/intensity: {info.get('target_power')}")
+        lines.append(f"- Interval: {_fmt(info.get('interval_identifier') or info.get('interval_index'))}")
+        lines.append(f"- Type: {_fmt(info.get('interval_type'))}")
+        lines.append(f"- Duration: {_fmt(info.get('duration'))}")
+        lines.append(f"- Target cadence: {_fmt(info.get('target_cadence'))}")
+        lines.append(f"- Cadence source: {_fmt(info.get('cadence_source'))}")
+        lines.append(f"- Target power/intensity: {_fmt(info.get('target_power'))}")
         lines.append("")
 
-        selected = info.get("selected_song")
+        # New payload shape: selected_* on interval root
         lines.append("SELECTED SONG")
-        if not selected:
+        if info.get("selected_song_id") is None:
             lines.append("- No selected song")
         else:
-            lines.append(f"- Title: {selected.get('title')}")
-            lines.append(f"- Artist: {selected.get('artist')}")
-            lines.append(f"- BPM: {selected.get('bpm')}")
-            lines.append(f"- BPM confidence: {selected.get('bpm_confidence')}")
-            lines.append(f"- Algorithm cadence: {selected.get('algorithm_cadence')}")
-            lines.append(f"- Genre: {selected.get('genre')}")
-            lines.append(f"- Selected start position: {selected.get('start_time')}")
-            lines.append(f"- Final recommendation score: {selected.get('final_score')}")
-            lines.append(f"- Genre match: {selected.get('genre_match')} (count={selected.get('genre_match_count')})")
-            lines.append(f"- User preference score: {selected.get('user_preference_score')}")
-            lines.append(f"- Recent-play penalty: {selected.get('recent_play_penalty')}")
+            selected_from_candidates = None
+            for c in (info.get("candidates_top10") or []):
+                if c.get("song_id") == info.get("selected_song_id"):
+                    selected_from_candidates = c
+                    break
+
+            lines.append(f"- Song ID: {_fmt(info.get('selected_song_id'))}")
+            lines.append(f"- Selected start position: {_fmt(info.get('selected_start_position'))}")
+            lines.append(f"- Final recommendation score: {_fmt4(info.get('selected_final_score'))}")
+
+            if selected_from_candidates:
+                lines.append(f"- Title: {_fmt(selected_from_candidates.get('title'))}")
+                lines.append(f"- Artist: {_fmt(selected_from_candidates.get('artist'))}")
+                lines.append(f"- BPM: {_fmt(selected_from_candidates.get('bpm'))}")
+                lines.append(f"- BPM confidence: {_fmt(selected_from_candidates.get('bpm_confidence'))}")
+                lines.append(f"- Algorithm cadence: {_fmt(selected_from_candidates.get('algorithm_cadence'))}")
+                lines.append(f"- Genre: {_fmt(selected_from_candidates.get('genre'))}")
+                lines.append(f"- Genre match: {_fmt(selected_from_candidates.get('genre_match'))} (count={_fmt(selected_from_candidates.get('genre_match_count'))})")
+                lines.append(f"- User preference score: {_fmt(selected_from_candidates.get('user_preference_score'))}")
+                lines.append(f"- Recent-play penalty: {_fmt(selected_from_candidates.get('recent_play_penalty'))}")
         lines.append("")
 
         lines.append("TOP CANDIDATES")
-        candidates = info.get("candidates") or []
+        candidates = info.get("candidates_top10") or []
         if not candidates:
             lines.append("- No candidates")
         else:
             for c in candidates:
                 lines.append(
-                    f"[#{c.get('rank')}] {c.get('title')} — {c.get('artist')} | "
-                    f"score={c.get('final_score'):.4f} | "
-                    f"cad_dist={c.get('cadence_distance')} | "
-                    f"bpm={c.get('bpm')} conf={c.get('bpm_confidence')} | "
-                    f"genre_match={c.get('genre_match')}({c.get('genre_match_count')}) | "
-                    f"user_pref={c.get('user_preference_score')} | "
-                    f"recent_penalty={c.get('recent_play_penalty')}"
+                    f"[#{_fmt(c.get('rank'))}] {_fmt(c.get('title'))} — {_fmt(c.get('artist'))} | "
+                    f"score={_fmt4(c.get('final_score'))} | "
+                    f"cad_dist={_fmt(c.get('cadence_difference'))} | "
+                    f"bpm={_fmt(c.get('bpm'))} conf={_fmt(c.get('bpm_confidence'))} | "
+                    f"genre_match={_fmt(c.get('genre_match'))}({_fmt(c.get('genre_match_count'))}) | "
+                    f"user_pref={_fmt(c.get('user_preference_score'))} | "
+                    f"recent_penalty={_fmt(c.get('recent_play_penalty'))}"
                 )
                 lines.append(
-                    f"    components: cadence={c.get('cadence_score'):.4f}, "
-                    f"power={c.get('power_score'):.4f}, conf={c.get('confidence_score'):.4f}, "
-                    f"song={c.get('song_score'):.4f}, bonus={c.get('cadence_compatible_bonus'):.4f}"
+                    f"    components: cadence={_fmt4(c.get('cadence_score'))}, "
+                    f"power={_fmt4(c.get('power_score'))}, conf={_fmt4(c.get('confidence_score'))}, "
+                    f"song={_fmt4(c.get('song_score'))}, bonus={_fmt4(c.get('cadence_compatible_bonus'))}"
+                )
+                lines.append(
+                    f"    cadence match: effective_bpm={_fmt(c.get('effective_bpm'))}, "
+                    f"multiplier={_fmt(c.get('tempo_multiplier'))}, compatible={_fmt(c.get('cadence_compatible'))}, "
+                    f"source={_fmt(c.get('cadence_distance_source'))}"
                 )
 
         return "\n".join(lines)

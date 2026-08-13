@@ -116,6 +116,7 @@ class AppController:
     def get_current_interval_debug_info(self) -> Optional[Dict[str, Any]]:
         """
         Returns debug info for current interval from latest recommender payload.
+        Supports current payload shape: {"intervals": [...]}.
         """
         payload = self._last_recommendation_debug
         if not payload:
@@ -126,7 +127,8 @@ class AppController:
         if idx is None:
             return None
 
-        interval_items = payload.get("interval_recommendations") or []
+        # New recommender payload key
+        interval_items = payload.get("intervals") or []
         if not isinstance(interval_items, list):
             return None
         if idx < 0 or idx >= len(interval_items):
