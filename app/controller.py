@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 import json
 import logging
-from typing import Optional, List, Any, Union
+from typing import Optional, List, Any, Union, Dict
 from PySide6.QtWidgets import QApplication
 
 from workout.model import Interval, Workout
@@ -20,6 +20,7 @@ from music.player import MusicPlayer
 from database.admin_client import create_admin_supabase
 from ui.main_window import MainWindow
 from database.workouts import list_workouts, get_workout_by_id
+from recommendation.recommender import set_recommendation_debug_sink
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,10 @@ class AppController:
         self.scheduler = WorkoutScheduler(self)
         self.music_player = MusicPlayer(self.scheduler)
         self.admin_client = create_admin_supabase()
+        self._last_recommendation_debug: Optional[Dict[str, Any]] = None
+
+        # register recommendation debug sink
+        set_recommendation_debug_sink(self._on_recommendation_debug)
 
         window = MainWindow(self)
         window.show()
@@ -104,3 +109,26 @@ class AppController:
 
     def list_available_workouts(self):
         return list_workouts(self.admin_client)
+
+    def _on_recommendation_debug(self, payload: Dict[str, Any]) -> None:
+        self._last_recommendation_debug = payload
+
+    def get_current_interval_debug_info(self) -> Optional[Dict[str, Any]]:
+        """
+        Returns debug info for current interval from latest recommender payload.
+        """
+        payload = self._last_recommendation_debug
+        if not payload:
+            return None
+
+        state = self.get_workout_state()
+        idx = state.interval_index
+        if idx is None:
+            return None
+
+        interval_items = payload.get("interval_recommendations") or []
+        if not isinstance(interval_items, list):
+            return None
+        if idx < 0 or idx >= len(interval_items):
+            return None
+        return interval_items[idx]

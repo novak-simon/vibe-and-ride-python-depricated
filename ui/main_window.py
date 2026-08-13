@@ -16,6 +16,9 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
     QWidget,
+    QDialog,
+    QPlainTextEdit,
+    QDialogButtonBox,
 )
 
 from workout.model import Interval, Workout
@@ -50,6 +53,9 @@ class MainWindow(QMainWindow):
 
         self._load_button = QPushButton("Select workout...")
         self._load_button.clicked.connect(self._load_workout)
+
+        self._debug_button = QPushButton("Debug")
+        self._debug_button.clicked.connect(self._show_current_interval_debug)
 
         self._workout_title_label = QLabel("No workout loaded")
         self._workout_title_label.setAlignment(Qt.AlignLeft)
@@ -92,8 +98,13 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(self._reset_button)
         button_layout.addWidget(self._resync_button)
 
+        top_layout = QHBoxLayout()
+        top_layout.addWidget(self._load_button)
+        top_layout.addStretch(1)
+        top_layout.addWidget(self._debug_button)
+
         layout = QVBoxLayout()
-        layout.addWidget(self._load_button)
+        layout.addLayout(top_layout)
         layout.addWidget(self._workout_title_label)
         layout.addWidget(self._interval_count_label)
         layout.addWidget(self._interval_label)
@@ -325,3 +336,86 @@ class MainWindow(QMainWindow):
         if self._controller.is_music_available() and audio_output is not None:
             audio_output.setVolume(1.0)
             audio_output.setMuted(False)
+
+    def _show_current_interval_debug(self) -> None:
+        info = self._controller.get_current_interval_debug_info()
+        if not info:
+            QMessageBox.information(
+                self,
+                "Recommendation Debug",
+                "No debug info available for current interval yet.",
+            )
+            return
+
+        text = self._format_interval_debug_text(info)
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Recommendation Debug (Current Interval)")
+        dlg.resize(920, 640)
+
+        layout = QVBoxLayout(dlg)
+        editor = QPlainTextEdit(dlg)
+        editor.setReadOnly(True)
+        editor.setPlainText(text)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Close, parent=dlg)
+        buttons.rejected.connect(dlg.reject)
+        buttons.accepted.connect(dlg.accept)
+        buttons.button(QDialogButtonBox.Close).clicked.connect(dlg.accept)
+
+        layout.addWidget(editor)
+        layout.addWidget(buttons)
+        dlg.exec()
+
+    def _format_interval_debug_text(self, info: dict) -> str:
+        lines = []
+
+        lines.append("WORKOUT / INTERVAL")
+        lines.append(f"- Interval: {info.get('interval_identifier') or info.get('interval_index')}")
+        lines.append(f"- Type: {info.get('interval_type')}")
+        lines.append(f"- Duration: {info.get('duration')}")
+        lines.append(f"- Target cadence: {info.get('target_cadence')}")
+        lines.append(f"- Cadence source: {info.get('cadence_source')}")
+        lines.append(f"- Target power/intensity: {info.get('target_power')}")
+        lines.append("")
+
+        selected = info.get("selected_song")
+        lines.append("SELECTED SONG")
+        if not selected:
+            lines.append("- No selected song")
+        else:
+            lines.append(f"- Title: {selected.get('title')}")
+            lines.append(f"- Artist: {selected.get('artist')}")
+            lines.append(f"- BPM: {selected.get('bpm')}")
+            lines.append(f"- BPM confidence: {selected.get('bpm_confidence')}")
+            lines.append(f"- Algorithm cadence: {selected.get('algorithm_cadence')}")
+            lines.append(f"- Genre: {selected.get('genre')}")
+            lines.append(f"- Selected start position: {selected.get('start_time')}")
+            lines.append(f"- Final recommendation score: {selected.get('final_score')}")
+            lines.append(f"- Genre match: {selected.get('genre_match')} (count={selected.get('genre_match_count')})")
+            lines.append(f"- User preference score: {selected.get('user_preference_score')}")
+            lines.append(f"- Recent-play penalty: {selected.get('recent_play_penalty')}")
+        lines.append("")
+
+        lines.append("TOP CANDIDATES")
+        candidates = info.get("candidates") or []
+        if not candidates:
+            lines.append("- No candidates")
+        else:
+            for c in candidates:
+                lines.append(
+                    f"[#{c.get('rank')}] {c.get('title')} — {c.get('artist')} | "
+                    f"score={c.get('final_score'):.4f} | "
+                    f"cad_dist={c.get('cadence_distance')} | "
+                    f"bpm={c.get('bpm')} conf={c.get('bpm_confidence')} | "
+                    f"genre_match={c.get('genre_match')}({c.get('genre_match_count')}) | "
+                    f"user_pref={c.get('user_preference_score')} | "
+                    f"recent_penalty={c.get('recent_play_penalty')}"
+                )
+                lines.append(
+                    f"    components: cadence={c.get('cadence_score'):.4f}, "
+                    f"power={c.get('power_score'):.4f}, conf={c.get('confidence_score'):.4f}, "
+                    f"song={c.get('song_score'):.4f}, bonus={c.get('cadence_compatible_bonus'):.4f}"
+                )
+
+        return "\n".join(lines)
