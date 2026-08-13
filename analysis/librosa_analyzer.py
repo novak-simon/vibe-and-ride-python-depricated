@@ -5,6 +5,7 @@ import librosa
 from typing import List, Optional
 
 from .model import AudioAnalysis
+from helper_methods.analysis_methods import save_in_downloads_as
 
 
 class LibrosaAnalyzer:
@@ -21,6 +22,7 @@ class LibrosaAnalyzer:
             raise ValueError(f"Unable to decode audio from {audio_path}")
 
         tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
+        save_in_downloads_as(beat_frames, "librosa_beat_frames")
         bpm = []
         if isinstance(tempo, float):
             bpm.append(tempo)

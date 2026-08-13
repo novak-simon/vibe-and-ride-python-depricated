@@ -6,6 +6,7 @@ from typing import List, Optional, Any
 from BeatNet.BeatNet import BeatNet
 
 from .model import AudioAnalysis
+from helper_methods.analysis_methods import save_in_downloads_as
 
 
 class BeatnetAnalyzer:
@@ -33,6 +34,7 @@ class BeatnetAnalyzer:
 
         estimator = BeatNet(1, mode="offline", inference_model="DBN", plot=[], thread=False)
         output = estimator.process(audio_path)
+        save_in_downloads_as(output, "beatnet_output")
 
         beat_times: List[float] = []
         bpm_candidates: List[float] = []

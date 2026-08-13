@@ -300,7 +300,6 @@ def rank_by_interval_match(songs: List[Song], intervals: List[Interval]) -> List
             if usable_interval_scores[j]:
                 song = None
                 while (song == None or song.id in used_songs) and usable_interval_scores[j]: # and len(interval_scores[j]) > 0:
-                    print("Ich bin da")
                     song = usable_interval_scores[j].pop(0)
             else:
                 song = interval_scores[j][len(interval_scores)-third_candidate_pool_limit+i]

@@ -138,7 +138,18 @@ class AudioAnalysisService:
         return librosa_analysis_bpm, beatnet_analysis_bpm, librosa_analysis_intervals, beatnet_analysis_intervals
     
     def _calculate_final_bpm_and_confidence(self, librosa_bpm: float, beatnet_bpm: float, librosa_confidence: float, beatnet_confidence: float) -> int:
-        if abs(librosa_confidence - beatnet_confidence) > 100:
+        if librosa_confidence is None or beatnet_confidence is None:
+            if librosa_confidence is None:
+                if beatnet_confidence is None:
+                    final_confidence = 0
+                    final_bpm = (librosa_bpm + beatnet_bpm) / 2
+                else:
+                    final_confidence = beatnet_confidence
+                    final_bpm = beatnet_bpm
+            else:
+                final_confidence = librosa_confidence
+                final_bpm = librosa_bpm
+        elif abs(librosa_confidence - beatnet_confidence) > 100:
             if librosa_confidence > beatnet_confidence:
                 final_bpm = librosa_bpm
                 final_confidence = librosa_confidence - 100
