@@ -27,7 +27,7 @@ class AudioAnalysisService:
         self.beatnet_analyzer = BeatnetAnalyzer()
         self.start_time_analyzer = StartTimeAnalyzer()
 
-    def analyze_batch(self, limit: int = 50, force: bool = False) -> None:
+    def analyze_batch(self, limit: int = 50, force: bool = False, start_time_only: bool = False) -> None:
         if force:
             songs = fetch_songs(self.db_client, limit=limit)
         else:
@@ -38,21 +38,24 @@ class AudioAnalysisService:
 
         for index, song in enumerate(songs, start=1):
             print(f"Analyzing {index}/{len(songs)}: {song.title}")
-            self.analyze_song(song)
+            self.analyze_song(song, start_time_only)
 
-    def analyze_by_id(self, id: int) -> None:
+    def analyze_by_id(self, id: int, start_time_only: bool = False) -> None:
         song = get_song_by_id(id, self.db_client)
         print(f"Analyzing {song.title}")
-        self.analyze_song(song)
+        self.analyze_song(song, start_time_only)
 
 
-    def analyze_song(self, song: Song) -> None:
+    def analyze_song(self, song: Song, start_time_only: bool = False) -> None:
         try:
             with self._prepare_local_audio(song) as audio_path:
-                librosa_analysis = self.librosa_analyzer.analyze(audio_path)
-                beatnet_analysis = self.beatnet_analyzer.analyze(audio_path)
                 start_time_analysis = self.start_time_analyzer.analyze(song)
-                final_analysis: AudioAnalysis = self._merge_analysis(librosa_analysis, beatnet_analysis, start_time_analysis)
+                if start_time_only and not song.bpm == 0:
+                    final_analysis = AudioAnalysis(song.bpm, song.bpm_confidence, song.beat_intervals, start_time_analysis)
+                else:
+                    librosa_analysis = self.librosa_analyzer.analyze(audio_path)
+                    beatnet_analysis = self.beatnet_analyzer.analyze(audio_path)
+                    final_analysis: AudioAnalysis = self._merge_analysis(librosa_analysis, beatnet_analysis, start_time_analysis)
 
             update_song_analysis(self.db_client, song.id, final_analysis)
 

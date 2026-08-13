@@ -30,14 +30,20 @@ def main() -> None:
         default=False,
         help="If set True, analyzer will analyze songs even if they were previously analyzed and will update the values in database."
     )
+    parser.add_argument(
+        "--stonly",
+        type=bool,
+        default=False,
+        help="If set True, analyzer will analyze only start time if possible."
+    )
     args = parser.parse_args()
 
     client = _effective_client(client=admin_client)
     service = AudioAnalysisService(client)
     if args.id == 0:
-        service.analyze_batch(limit=args.limit, force=args.force)
+        service.analyze_batch(limit=args.limit, force=args.force, start_time_only=args.stonly)
     else:
-        service.analyze_by_id(id=args.id)
+        service.analyze_by_id(id=args.id, start_time_only=args.stonly)
 
 
 if __name__ == "__main__":

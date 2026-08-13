@@ -39,9 +39,14 @@ class StartTimeAnalyzer:
                 values_blocks.append((round(mean([val[0] for val in temp])), round(j*length_10, 1)))
                 temp.clear()
         print(values_blocks)
-
+        alt_val = None
         for val in values_blocks:
             if val[0] < 10:
+                alt_val = val
                 continue
+            elif song.duration / val[1] < 2:
+                if alt_val:
+                    return alt_val[1]
+                return 0
             return val[1]        
         return 0
