@@ -36,6 +36,7 @@ class WorkoutState:
     current_interval: Optional[Interval]
     elapsed_in_interval: float
     remaining_in_interval: float
+    interval_length: float
     total_elapsed: float
     total_remaining: float
     interval_changed: bool
@@ -151,9 +152,11 @@ class WorkoutScheduler:
         if interval is None:
             elapsed_in_interval = 0.0
             remaining_in_interval = 0.0
+            interval_length = 0.0
         else:
             elapsed_in_interval = total_elapsed - interval_start
             remaining_in_interval = max(0.0, interval.duration - elapsed_in_interval)
+            interval_length = interval.duration
 
         interval_changed = (
             self._last_interval_index is _UNSET_LAST_INTERVAL
@@ -167,6 +170,7 @@ class WorkoutScheduler:
             current_interval=interval,
             elapsed_in_interval=elapsed_in_interval,
             remaining_in_interval=remaining_in_interval,
+            interval_length=interval_length,
             total_elapsed=total_elapsed,
             total_remaining=max(0.0, self.workout.total_duration - total_elapsed) if not self.workout is None else 0.0,
             interval_changed=interval_changed,

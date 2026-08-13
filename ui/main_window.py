@@ -273,7 +273,7 @@ class MainWindow(QMainWindow):
             else "Music: disabled"
         )
         self._interval_time_label.setText(
-            f"Interval time: {format_seconds(state.elapsed_in_interval)} / {format_seconds(state.remaining_in_interval)}"
+            f"Interval time: {format_seconds(state.elapsed_in_interval)} / {format_seconds(state.interval_length)}"
         )
         self._workout_time_label.setText(
             f"Workout time: {format_seconds(state.total_elapsed)} / {format_seconds(workout.total_duration if not workout is None else 0.0)}"
