@@ -32,13 +32,26 @@ def get_stat_by_user_and_song_id(user_id: int, song_id: int, client: Any | None 
     return _song_from_record(records[0]) if records else None
 
 def get_stats_by_user_id(user_id: int, limit: int = 50, client: Any | None = None) -> Optional[UserSongStats]:
+    """
+    Returns user_song_stats records from database that correspond to a certain user.
+    Limit is 50 records by default, can be set to anything.
+    If limit is set to None, all existing records will be returned.
+    """
     client = _effective_client(client)
-    response = (
-        client.table("user_song_stats")
-        .select("*")
-        .eq("user_id", user_id)
-        .limit(limit)
-        .execute()
-    )
+    if limit is None:
+        response = (
+            client.table("user_song_stats")
+            .select("*")
+            .eq("user_id", user_id)
+            .execute()
+            )
+    else:
+        response = (
+            client.table("user_song_stats")
+            .select("*")
+            .eq("user_id", user_id)
+            .limit(limit)
+            .execute()
+        )
     records = _extract_data(response)
     return _song_from_record(records[0]) if records else None
