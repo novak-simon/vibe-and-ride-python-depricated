@@ -22,7 +22,6 @@ class LibrosaAnalyzer:
             raise ValueError(f"Unable to decode audio from {audio_path}")
 
         tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
-        save_in_downloads_as(beat_frames, "librosa_beat_frames")
         bpm = []
         if isinstance(tempo, float):
             bpm.append(tempo)
@@ -31,6 +30,7 @@ class LibrosaAnalyzer:
                 bpm.append(round(temp))
 
         beat_times = librosa.frames_to_time(beat_frames, sr=sr)
+        save_in_downloads_as(beat_times, "librosa_beat_times")
         beats = [float(value) for value in beat_times]
         beat_intervals = [
             float(beats[i + 1] - beats[i]) for i in range(len(beats) - 1)

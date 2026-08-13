@@ -13,8 +13,8 @@ import math
 from database.songs import fetch_unanalyzed_songs, update_song_analysis, get_song_by_id, fetch_songs
 from analysis.librosa_analyzer import LibrosaAnalyzer
 from analysis.beatnet_analyzer import BeatnetAnalyzer
+from analysis.start_time_analyzer import StartTimeAnalyzer
 from analysis.model import AudioAnalysis
-from analysis.start_time_analyzer import analyze_for_start_time
 from music.model import Song
 
 logger = logging.getLogger(__name__)
@@ -25,6 +25,7 @@ class AudioAnalysisService:
         self.db_client = db_client
         self.librosa_analyzer = LibrosaAnalyzer()
         self.beatnet_analyzer = BeatnetAnalyzer()
+        self.start_time_analyzer = StartTimeAnalyzer()
 
     def analyze_batch(self, limit: int = 50, force: bool = False) -> None:
         if force:
@@ -50,7 +51,8 @@ class AudioAnalysisService:
             with self._prepare_local_audio(song) as audio_path:
                 librosa_analysis = self.librosa_analyzer.analyze(audio_path)
                 beatnet_analysis = self.beatnet_analyzer.analyze(audio_path)
-                final_analysis: AudioAnalysis = self._merge_analysis(librosa_analysis, beatnet_analysis)
+                start_time_analysis = self.start_time_analyzer.analyze(song)
+                final_analysis: AudioAnalysis = self._merge_analysis(librosa_analysis, beatnet_analysis, start_time_analysis)
 
             update_song_analysis(self.db_client, song.id, final_analysis)
 
@@ -195,18 +197,17 @@ class AudioAnalysisService:
         return final_intervals
         
 
-    def _merge_analysis(self, librosa_analysis: AudioAnalysis, beatnet_analysis: AudioAnalysis) -> AudioAnalysis:
+    def _merge_analysis(self, librosa_analysis: AudioAnalysis, beatnet_analysis: AudioAnalysis, start_time_analysis: int) -> AudioAnalysis:
         relation = beatnet_analysis.bpm / librosa_analysis.bpm
         tolerance = 0.15
         relation_estimate = self._calculate_relation_estimate(relation, tolerance)
         librosa_analysis_bpm, beatnet_analysis_bpm, librosa_analysis_intervals, beatnet_analysis_intervals = self._normalize_by_relation_estimate(relation_estimate, librosa_analysis, beatnet_analysis)
         final_bpm, final_confidence = self._calculate_final_bpm_and_confidence(librosa_analysis_bpm, beatnet_analysis_bpm, librosa_analysis.bpm_confidence, beatnet_analysis.bpm_confidence)
         final_intervals = self._merge_intervals(librosa_analysis_intervals, beatnet_analysis_intervals)
-        start_time = analyze_for_start_time(librosa_analysis, beatnet_analysis)
         final_analysis: AudioAnalysis = AudioAnalysis(
         bpm= final_bpm,
         bpm_confidence= final_confidence,
         beat_intervals= final_intervals,
-        start_time=start_time
+        start_time=start_time_analysis
         )
         return final_analysis

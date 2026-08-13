@@ -1,9 +1,15 @@
-from analysis.model import AudioAnalysis
+from music.model import Song
 
-def analyze_for_start_time(librosa_analysis: AudioAnalysis, beatnet_analysis: AudioAnalysis) -> int:
-    """
-    Estimates best starting time in miliseconds for playing the song
-    Calculates based on audio analysis from Librosa and Beatnet
-    TEMPORARILY RETURNS ALWAYS ZERO
-    """
-    return 0
+class StartTimeAnalyzer:
+
+    def analyze(self, song: Song) -> int:
+        """
+        Estimates best starting time in miliseconds for playing the song
+        Calculates based on waveforms of the song
+        TEMPORARILY RETURNS ALWAYS ZERO
+        """
+        if not song.waveform:
+            return 0
+        
+        
+        return 0
