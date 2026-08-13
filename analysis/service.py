@@ -61,6 +61,7 @@ class AudioAnalysisService:
                 f"  Confidence: "
                 f"{final_analysis.bpm_confidence if final_analysis.bpm_confidence is not None else 'None'}"
             )
+            print(f"  Start time: {final_analysis.start_time}")
         except Exception as err:
             logger.exception("Failed to analyze song %s (%s)", song.title, song.id)
             print(f"  FAILED: {err}")
@@ -197,7 +198,7 @@ class AudioAnalysisService:
         return final_intervals
         
 
-    def _merge_analysis(self, librosa_analysis: AudioAnalysis, beatnet_analysis: AudioAnalysis, start_time_analysis: int) -> AudioAnalysis:
+    def _merge_analysis(self, librosa_analysis: AudioAnalysis, beatnet_analysis: AudioAnalysis, start_time_analysis: float) -> AudioAnalysis:
         relation = beatnet_analysis.bpm / librosa_analysis.bpm
         tolerance = 0.15
         relation_estimate = self._calculate_relation_estimate(relation, tolerance)

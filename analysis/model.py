@@ -9,7 +9,7 @@ class AudioAnalysis:
     bpm: int
     bpm_confidence: Optional[int]
     beat_intervals: List[float]
-    start_time: int = 0
+    start_time: float = 0
 
     def to_record(self) -> Dict[str, Any]:
         return {
