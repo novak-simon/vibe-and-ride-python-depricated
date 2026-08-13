@@ -33,7 +33,7 @@ class StartTimeAnalyzer:
                 temp.add(values_10[j])
                 continue
             avg = mean([val[0] for val in temp])
-            if abs(values_10[j][0] - avg) < 20:
+            if abs(values_10[j][0] - avg) < 15:
                 temp.add(values_10[j])
             else:
                 values_blocks.append((round(mean([val[0] for val in temp])), round(j*length_10, 1)))
@@ -44,7 +44,7 @@ class StartTimeAnalyzer:
             if val[0] < 10:
                 alt_val = val
                 continue
-            elif song.duration / val[1] < 2:
+            elif song.duration / val[1] < 2 or val[0] > 60:
                 if alt_val:
                     return alt_val[1]
                 return 0
