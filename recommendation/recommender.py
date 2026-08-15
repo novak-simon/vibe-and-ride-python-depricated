@@ -14,28 +14,44 @@ from recommendation.methods import _get, _clamp01, _clamp02, _safe_list, calcula
 
 
 @dataclass(frozen=True)
-class Recommendation:
+class SongRecommendation:
+    song: Song = None
+    score: float = 0.0
+    preference_score: float = 0.0
+    cadence_score: float = 0.0
+    conf_score: float = 0.0
+    song_score: float = 0.0
+
+@dataclass(frozen=True)
+class PreferenceRecommendation():
+    song: Song = None
+    score: float = 0.0
+    user: User = None
+
+@dataclass(frozen=True)
+class IntervalRecommendation():
     song: Song = None
     score: float = 0.0
     cadence_score: float = 0.0
     conf_score: float = 0.0
     song_score: float = 0.0
+    interval: Interval = None
 
 admin_client = create_admin_supabase()
 
 FIRST_CANDIDATE_POOL_LIMIT = 100
 
-def get_user_preference_score(song: Song, user: User) -> float:
+def get_user_preference_score(song: Song, user: User) -> PreferenceRecommendation:
     if not user:
         user = get_current_user()
     if not song or not user:
-        return 0
+        return PreferenceRecommendation()
     number_of_matching_genres: float = len(set(song.genre) & set(user.genre_preferences)) if song.genre else 0.5
     stat = get_stat_by_user_and_song_id(user.id, song.id, admin_client)
     if stat:
         since_last_played = current_timestampz() - stat.last_played_at
         if since_last_played < timedelta(hours=1):
-            return 0
+            return PreferenceRecommendation(song=song, score=0, user=user)
         else:
             repetition_coefficient = min(2, since_last_played/timedelta(days=2))
         like_coefficient = 2 if stat.is_liked is True else 1
@@ -46,7 +62,7 @@ def get_user_preference_score(song: Song, user: User) -> float:
         score = number_of_matching_genres * repetition_coefficient * like_coefficient * skip_coefficient
     else:
         score = number_of_matching_genres * 8.1
-    return score
+    return PreferenceRecommendation(song=song, score=score, user=user)
 
 def get_interval_match_score(song: Song, interval: Interval) -> float:
     target_cadence = _get(interval, "cadence", None)
@@ -162,20 +178,34 @@ def get_interval_match_score(song: Song, interval: Interval) -> float:
         0.25 * song_score +
         cadence_compatible_bonus
     )
-    return total_score
+    return IntervalRecommendation(
+        song=song,
+        score=total_score,
+        cadence_score=cadence_score,
+        conf_score=conf_score,
+        song_score=song_score,
+        interval=interval
+    )
 
-def get_song_recommendation_score(song: Song, user: Any, interval: Interval) -> Recommendation:
+def get_song_recommendation_score(song: Song, user: Any, interval: Interval) -> SongRecommendation:
     """
     Calculate a recommendation score for a given song based on user preferences and interval characteristics.
-    Returns a Recommendation object containing the song and its recommendation score.
+    Returns a SongRecommendation object containing the song and its recommendation score.
     """
     if user is None or interval is None or song is None:
-        return Recommendation(song=song, score=0)
-    user_preference_score = get_user_preference_score(song, user)
-    interval_match_score = get_interval_match_score(song, interval)
-    score = user_preference_score + interval_match_score
+        return SongRecommendation(song=song, score=0)
+    user_preference = get_user_preference_score(song, user)
+    interval_match = get_interval_match_score(song, interval)
+    score = user_preference.score + interval_match.score
 
-    return Recommendation(song=song, score=score)
+    return SongRecommendation(
+        song=song,
+        score=score,
+        preference_score=user_preference.score,
+        cadence_score=interval_match.cadence_score,
+        conf_score=interval_match.conf_score,
+        song_score=interval_match.song_score
+        )
 
 
 def recommend(interval: Interval) -> List[Song]:
@@ -195,4 +225,4 @@ def recommend(interval: Interval) -> List[Song]:
     candidates = []
     for candidate in first_candidate_pool:
         candidates.append(get_song_recommendation_score(candidate, user, interval))
-    return [rec.song for rec in sorted(candidates, key=lambda x: (-1 * x.score, -1 * x.cadence_score, -1 * x.conf_score, -1 * x.song_score, x.song.id))][:10]
+    return [rec.song for rec in sorted(candidates, key=lambda x: (-1 * x.score, -1 * x.preference_score, -1 * x.cadence_score, -1 * x.conf_score, -1 * x.song_score, x.song.id))][:10]
