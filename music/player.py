@@ -38,7 +38,6 @@ class MusicPlayer:
             and QAudioOutput is not None
             and QUrl is not None
         )
-        self._end_of_media_status = None
         self.admin_client = create_admin_supabase()
 
         if not self._backend_available:
@@ -73,13 +72,8 @@ class MusicPlayer:
             pass
 
         if self._provider.has_songs():
+            print(f"Initial song: {self._provider.get_current_song().title if self._provider.get_current_song() else 'None'}")
             self._set_current_source()
-
-        self._end_of_media_status = getattr(QMediaPlayer, "EndOfMedia", None)
-        if self._end_of_media_status is None:
-            media_status_enum = getattr(QMediaPlayer, "MediaStatus", None)
-            if media_status_enum is not None:
-                self._end_of_media_status = getattr(media_status_enum, "EndOfMedia", None)
 
         if hasattr(self._player, "mediaStatusChanged"):
             self._player.mediaStatusChanged.connect(self._on_media_status_changed)
@@ -132,7 +126,6 @@ class MusicPlayer:
         return None if self._provider is None else self._provider
 
     def _set_current_source(self, song: Song = None) -> None:
-
         if song is None:
             song = self._provider.get_current_song()
         if song is None or song.audio_url is None or QUrl is None:
@@ -146,13 +139,17 @@ class MusicPlayer:
         if hasattr(self._player, "setSource"):
             self._player.setSource(source)
 
+        print(f"Song: {self._current_song.title}, ID: {self._current_song.id}, BPM: {self._current_song.bpm}, Genre: {self._current_song.genre}, Start time: {self._current_song.start_time}")
+        increment_stat(stat="play_count", song_id=self.current_song().id, user_id=None, client=self.admin_client)
+
     def current_song(self) -> Optional[Song]:
         return self._current_song
 
     def play(self) -> None:
         if not self.available or self._player is None:
             return
-        if self._provider.get_current_song() is None and self._provider.has_songs():
+        if not self._player.source().isValid() and self._provider.has_songs():
+            print("Invalid source, loading new song")
             self._provider._current_index = 0
             self._set_current_source()
         self._player.play()
@@ -169,6 +166,7 @@ class MusicPlayer:
         if not self.available or self._player is None or not self._provider.has_songs():
             return
         next_song = self._provider.next_song(interval_changed)
+        print(f"Next track: {next_song.title if next_song else 'None'}")
         self._set_current_source(next_song)
         self._player.play()
 
@@ -177,15 +175,12 @@ class MusicPlayer:
         
 
     def _on_media_status_changed(self, status) -> None:
+        print(f"Media status changed: {status}")
         logger.info("Media status changed: %s", status)
         if status is QMediaPlayer.MediaStatus.LoadedMedia:
-            print("Loaded Media")
-            print(f"Song: {self._current_song.title}, ID: {self._current_song.id}, BPM: {self._current_song.bpm}, Genre: {self._current_song.genre}, Start time: {self._current_song.start_time}")
-            print(f"Start time planned: {self._current_song.start_time}")
             self._player.setPosition(int(self._current_song.start_time * 1000))
-            increment_stat(stat="play_count", song_id=self.current_song().id, user_id=None, client=self.admin_client)
-            print(f"Position {self._player.position()}")
-        if self._end_of_media_status is not None and status == self._end_of_media_status:
+        if status is QMediaPlayer.MediaStatus.EndOfMedia:
+            print("End of media reached")
             self.next_track()
 
     def _on_error(self, error, error_string) -> None:
