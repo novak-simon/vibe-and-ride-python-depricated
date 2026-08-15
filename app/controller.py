@@ -20,7 +20,7 @@ from music.player import MusicPlayer
 from database.admin_client import create_admin_supabase
 from ui.main_window import MainWindow
 from database.workouts import list_workouts, get_workout_by_id
-from database.user_song_stats import increment_stat
+from database.user_song_stats import increment_stat, set_stat_datetime
 from recommendation.recommender_depricated import set_recommendation_debug_sink
 
 logger = logging.getLogger(__name__)
@@ -87,6 +87,7 @@ class AppController:
 
     def refresh_state(self):
         state = self.get_workout_state()
+        print(f"Workout state: {state.status}, interval index: {state.interval_index}, interval changed: {state.interval_changed}")
         if state.status == WorkoutStatus.RUNNING:
             if state.interval_changed:
                 self.music_player.next_track(True)
@@ -97,6 +98,7 @@ class AppController:
         elif state.status == WorkoutStatus.PAUSED or state.status == WorkoutStatus.NOT_STARTED:
             self.music_player.pause()
         else:
+            print("Workout ended or in an unknown state")
             self.music_player.stop()
 
     def load_and_prepare_workout(self, path: Path = None, workout_id: str = None) -> None:
@@ -140,4 +142,5 @@ class AppController:
 
     def skip(self) -> None:
         increment_stat(stat="skip_count", song_id=self.music_player.current_song().id, user_id=None, client=self.admin_client)
+        set_stat_datetime(stat="last_skipped_at", song_id=self.music_player.current_song().id, user_id=None, client=self.admin_client)
         self.music_player.next_track()

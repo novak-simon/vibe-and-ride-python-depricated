@@ -12,7 +12,7 @@ except ImportError as exc:
     QUrl = QAudioOutput = QMediaPlayer = None
     _PYSIDE6_MULTIMEDIA_ERROR = exc
 
-from database.user_song_stats import increment_stat
+from database.user_song_stats import increment_stat, set_stat_datetime
 from database.admin_client import create_admin_supabase
 from music.model import Song
 from music.provider import SongProvider
@@ -120,6 +120,7 @@ class MusicPlayer:
         position_ms = self._player.position()
         starting_time = self._current_song.start_time if self._current_song else 0
         time_elapsed = position_ms / 1000.0 - starting_time
+        print(f"Time elapsed: {time_elapsed}, position_ms: {position_ms}, starting_time: {starting_time}")
         return time_elapsed if time_elapsed >= 0 else 0.0
 
     def get_provider(self) -> SongProvider:
@@ -141,6 +142,7 @@ class MusicPlayer:
 
         print(f"Song: {self._current_song.title}, ID: {self._current_song.id}, BPM: {self._current_song.bpm}, Genre: {self._current_song.genre}, Start time: {self._current_song.start_time}")
         increment_stat(stat="play_count", song_id=self.current_song().id, user_id=None, client=self.admin_client)
+        set_stat_datetime(stat="last_played_at", song_id=self.current_song().id, user_id=None, client=self.admin_client)
 
     def current_song(self) -> Optional[Song]:
         return self._current_song
@@ -160,11 +162,16 @@ class MusicPlayer:
 
     def stop(self) -> None:
         if self._player is not None:
+            increment_stat(stat="total_play_time", song_id=self.current_song().id, user_id=None, client=self.admin_client, increment_by=int(self.time_elapsed or 0))
             self._player.stop()
+            print(f"song id: {self.current_song().id if self.current_song() else 'None'}, time elapsed: {self.time_elapsed if self.time_elapsed is not None else 'None'}")
+            
 
     def next_track(self, interval_changed: bool = False) -> None:
         if not self.available or self._player is None or not self._provider.has_songs():
             return
+        if self._current_song is not None:
+            increment_stat(stat="total_play_time", song_id=self.current_song().id, user_id=None, client=self.admin_client, increment_by=int(self.time_elapsed or 0))
         next_song = self._provider.next_song(interval_changed)
         print(f"Next track: {next_song.title if next_song else 'None'}")
         self._set_current_source(next_song)

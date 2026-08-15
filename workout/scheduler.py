@@ -90,6 +90,8 @@ class WorkoutScheduler:
     def start(self) -> None:
         if self.is_running:
             return
+        elif self.workout is None:
+            return
         if self.workout.total_duration <= 0:
             self._status = WorkoutStatus.FINISHED
             self._elapsed_before_start = 0.0
