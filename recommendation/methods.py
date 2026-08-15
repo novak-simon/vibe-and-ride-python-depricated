@@ -18,20 +18,20 @@ def _get(obj: Any, key: str, default=None):
         return obj.get(key, default)
     return getattr(obj, key, default)
 
-def _clamp01(x: float) -> float:
+def _clamp01(x: float, y: float = 1.0) -> float:
     """Returns value clamped between 0 and 1."""
     if x < 0.0:
         return 0.0
-    elif x > 1.0:
-        return 1.0
+    elif x > y:
+        return y
     return x
 
-def _clamp02(x: float) -> float:
+def _clamp02(x: float, y: float = 1.0) -> float:
     """Returns value clamped between -1 and 1."""
-    if x < -1.0:
-        return -1.0
-    elif x > 1.0:
-        return 1.0
+    if x < -y:
+        return -y
+    elif x > y:
+        return y
     return x
 
 def calculate_bpm_match(song_bpm: Optional[float], target_cadence: Optional[float], bpm_tolerance: float) -> BPMMatch:

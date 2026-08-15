@@ -120,7 +120,6 @@ class MusicPlayer:
         position_ms = self._player.position()
         starting_time = self._current_song.start_time if self._current_song else 0
         time_elapsed = position_ms / 1000.0 - starting_time
-        print(f"Time elapsed: {time_elapsed}, position_ms: {position_ms}, starting_time: {starting_time}")
         return time_elapsed if time_elapsed >= 0 else 0.0
 
     def get_provider(self) -> SongProvider:

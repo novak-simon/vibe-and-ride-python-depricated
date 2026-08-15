@@ -14,6 +14,8 @@ import logging
 from typing import Optional, List, Any, Union, Dict
 from PySide6.QtWidgets import QApplication
 
+from music.model import Song
+from recommendation.recommender import SongRecommendation
 from workout.model import Interval, Workout
 from workout.scheduler import WorkoutScheduler, WorkoutStatus
 from music.player import MusicPlayer
@@ -21,7 +23,6 @@ from database.admin_client import create_admin_supabase
 from ui.main_window import MainWindow
 from database.workouts import list_workouts, get_workout_by_id
 from database.user_song_stats import increment_stat, set_stat_datetime
-from recommendation.recommender_depricated import set_recommendation_debug_sink
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +38,6 @@ class AppController:
         self.admin_client = create_admin_supabase()
         self._last_recommendation_debug: Optional[Dict[str, Any]] = None
 
-        # register recommendation debug sink
-        set_recommendation_debug_sink(self._on_recommendation_debug)
-
         window = MainWindow(self)
         window.show()
         sys.exit(app.exec())
@@ -50,8 +48,8 @@ class AppController:
     def get_music_player(self) -> MusicPlayer:
         return self.music_player
 
-    def get_current_song_title(self) -> str|None:
-        return self.music_player.current_song().title if self.music_player.current_song() is not None else None
+    def get_current_song(self) -> Song|None:
+        return self.music_player.current_song()
 
     def is_music_available(self) -> bool:
         return self.music_player.available
@@ -64,6 +62,7 @@ class AppController:
 
     def get_workout_state(self):
         return self.scheduler.get_state()
+    
     def list_available_workouts(self) -> List[dict]:
         return list_workouts(self.admin_client)
 
@@ -87,7 +86,6 @@ class AppController:
 
     def refresh_state(self):
         state = self.get_workout_state()
-        print(f"Workout state: {state.status}, interval index: {state.interval_index}, interval changed: {state.interval_changed}")
         if state.status == WorkoutStatus.RUNNING:
             if state.interval_changed:
                 self.music_player.next_track(True)
@@ -115,30 +113,14 @@ class AppController:
     def list_available_workouts(self):
         return list_workouts(self.admin_client)
 
-    def _on_recommendation_debug(self, payload: Dict[str, Any]) -> None:
-        self._last_recommendation_debug = payload
 
-    def get_current_interval_debug_info(self) -> Optional[Dict[str, Any]]:
+    def get_current_interval_debug_info(self) -> List[SongRecommendation]|None:
         """
-        Returns debug info for current interval from latest recommender payload.
-        Supports current payload shape: {"intervals": [...]}.
+        Returns the debug information for the current interval's recommendations, if available.
+        This includes the list of SongRecommendation objects for the current interval.
         """
-        payload = self._last_recommendation_debug
-        if not payload:
-            return None
-
-        state = self.get_workout_state()
-        idx = state.interval_index
-        if idx is None:
-            return None
-
-        # New recommender payload key
-        interval_items = payload.get("intervals") or []
-        if not isinstance(interval_items, list):
-            return None
-        if idx < 0 or idx >= len(interval_items):
-            return None
-        return interval_items[idx]
+        print(f"Getting current interval debug info")
+        return self.music_player.get_provider().recommendation_debug_info if self.music_player.get_provider() is not None else None
 
     def skip(self) -> None:
         increment_stat(stat="skip_count", song_id=self.music_player.current_song().id, user_id=None, client=self.admin_client)

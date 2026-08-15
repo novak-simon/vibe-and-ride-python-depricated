@@ -19,6 +19,7 @@ class SongProvider:
         self._songs: List[Song] = []
         self._current_index = -1
         self._interval_recs = []
+        self.recommendation_debug_info: Optional[List[SongRecommendation]] = None  # Store the last recommendation debug information
         self.scheduler: WorkoutScheduler = scheduler
         self._load_songs()
 
@@ -68,7 +69,8 @@ class SongProvider:
                 self._interval_recs.append(None)  # Ensure the list is long enough
             interval = workout.intervals[interval_index]
             print(f"Precomputing recommendations for interval {interval_index} of workout {workout.name if workout else 'None'}")
-            self._interval_recs[interval_index] = recommend(interval)
+            self._interval_recs[interval_index], self.recommendation_debug_info = recommend(interval)
+            print(f"Recommendation debug info for interval {interval_index}: {len(self.recommendation_debug_info)}")
             print(f"Precomputed {len(self._interval_recs[interval_index])} recommendations for interval {interval_index}")
         except Exception:
             # never crash the host when precomputing; log and continue
@@ -84,8 +86,7 @@ class SongProvider:
         else:
             recs = []
         if recs:
-            song = recs[self._current_index]
-            #print(f"Song: {song.title}, ID: {song.id}, BPM: {song.bpm}, Genre: {song.genre}, Start time: {song.start_time}")
+            print(f"Choosing song for interval {interval_index}: {len(recs)} recommendations available, current index: {self._current_index}")
             return recs[self._current_index]
         else:
             return self._songs[interval_index * 5 + self._current_index]

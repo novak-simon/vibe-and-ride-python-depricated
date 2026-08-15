@@ -3,7 +3,7 @@ import logging
 import json
 
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from PySide6.QtCore import QTimer, Qt, QUrl
 from PySide6.QtWidgets import (
@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
 )
 
+from recommendation.recommender import SongRecommendation
 from workout.model import Interval, Workout
 from workout.parser import parse_zwo_file
 from workout.scheduler import WorkoutScheduler, WorkoutStatus
@@ -286,7 +287,7 @@ class MainWindow(QMainWindow):
             self._interval_detail_label.setText(self._format_interval_description(state.current_interval))
 
         self._song_label.setText(
-            f"Song: {self._controller.get_current_song_title() or 'none'}"
+            f"Song: {self._controller.get_current_song().title if self._controller.get_current_song() is not None else 'none'}"
         )
         self._music_status_label.setText(
             f"Music: {'playing' if state.status == WorkoutStatus.RUNNING else 'paused'}"
@@ -379,7 +380,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(buttons)
         dlg.exec()
 
-    def _format_interval_debug_text(self, info: dict) -> str:
+    def _format_interval_debug_text(self, info: List[SongRecommendation]) -> str:
         def _fmt(v):
             return "-" if v is None else str(v)
 
@@ -392,65 +393,33 @@ class MainWindow(QMainWindow):
         lines = []
 
         lines.append("WORKOUT / INTERVAL")
-        lines.append(f"- Interval: {_fmt(info.get('interval_identifier') or info.get('interval_index'))}")
-        lines.append(f"- Type: {_fmt(info.get('interval_type'))}")
-        lines.append(f"- Duration: {_fmt(info.get('duration'))}")
-        lines.append(f"- Target cadence: {_fmt(info.get('target_cadence'))}")
-        lines.append(f"- Cadence source: {_fmt(info.get('cadence_source'))}")
-        lines.append(f"- Target power/intensity: {_fmt(info.get('target_power'))}")
+        lines.append(f"- Interval: {_fmt(self._controller.get_workout_state().interval_index)}")
+        lines.append(f"- Type: {_fmt(self._controller.get_workout_state().current_interval.type if self._controller.get_workout_state().current_interval else None)}")
+        lines.append(f"- Duration: {_fmt(self._controller.get_workout_state().interval_length)}")
+        lines.append(f"- Target cadence: {_fmt(self._controller.get_workout_state().current_interval.cadence if self._controller.get_workout_state().current_interval else None)}")
+        lines.append(f"- Target power: {_fmt(self._controller.get_workout_state().current_interval.power if self._controller.get_workout_state().current_interval else None)}")
         lines.append("")
 
         # New payload shape: selected_* on interval root
-        lines.append("SELECTED SONG")
-        if info.get("selected_song_id") is None:
-            lines.append("- No selected song")
-        else:
-            selected_from_candidates = None
-            for c in (info.get("candidates_top10") or []):
-                if c.get("song_id") == info.get("selected_song_id"):
-                    selected_from_candidates = c
-                    break
-
-            lines.append(f"- Song ID: {_fmt(info.get('selected_song_id'))}")
-            lines.append(f"- Selected start position: {_fmt(info.get('selected_start_position'))}")
-            lines.append(f"- Final recommendation score: {_fmt4(info.get('selected_final_score'))}")
-
-            if selected_from_candidates:
-                lines.append(f"- Title: {_fmt(selected_from_candidates.get('title'))}")
-                lines.append(f"- Artist: {_fmt(selected_from_candidates.get('artist'))}")
-                lines.append(f"- BPM: {_fmt(selected_from_candidates.get('bpm'))}")
-                lines.append(f"- BPM confidence: {_fmt(selected_from_candidates.get('bpm_confidence'))}")
-                lines.append(f"- Algorithm cadence: {_fmt(selected_from_candidates.get('algorithm_cadence'))}")
-                lines.append(f"- Genre: {_fmt(selected_from_candidates.get('genre'))}")
-                lines.append(f"- Genre match: {_fmt(selected_from_candidates.get('genre_match'))} (count={_fmt(selected_from_candidates.get('genre_match_count'))})")
-                lines.append(f"- User preference score: {_fmt(selected_from_candidates.get('user_preference_score'))}")
-                lines.append(f"- Recent-play penalty: {_fmt(selected_from_candidates.get('recent_play_penalty'))}")
-        lines.append("")
-
-        lines.append("TOP CANDIDATES")
-        candidates = info.get("candidates_top10") or []
-        if not candidates:
-            lines.append("- No candidates")
-        else:
-            for c in candidates:
-                lines.append(
-                    f"[#{_fmt(c.get('rank'))}] {_fmt(c.get('title'))} — {_fmt(c.get('artist'))} | "
-                    f"score={_fmt4(c.get('final_score'))} | "
-                    f"cad_dist={_fmt(c.get('cadence_difference'))} | "
-                    f"bpm={_fmt(c.get('bpm'))} conf={_fmt(c.get('bpm_confidence'))} | "
-                    f"genre_match={_fmt(c.get('genre_match'))}({_fmt(c.get('genre_match_count'))}) | "
-                    f"user_pref={_fmt(c.get('user_preference_score'))} | "
-                    f"recent_penalty={_fmt(c.get('recent_play_penalty'))}"
-                )
-                lines.append(
-                    f"    components: cadence={_fmt4(c.get('cadence_score'))}, "
-                    f"power={_fmt4(c.get('power_score'))}, conf={_fmt4(c.get('confidence_score'))}, "
-                    f"song={_fmt4(c.get('song_score'))}, bonus={_fmt4(c.get('cadence_compatible_bonus'))}"
-                )
-                lines.append(
-                    f"    cadence match: effective_bpm={_fmt(c.get('effective_bpm'))}, "
-                    f"multiplier={_fmt(c.get('tempo_multiplier'))}, compatible={_fmt(c.get('cadence_compatible'))}, "
-                    f"source={_fmt(c.get('cadence_distance_source'))}"
-                )
-
+        lines.append("SELECTED SONGS")
+        for c in info:
+            lines.append(f"- Song ID: {_fmt(c.song.id)}")
+            lines.append(f"- Title: {_fmt(c.song.title)}")
+            lines.append(f"- Artist: {_fmt(c.song.artist)}")
+            lines.append(f"- BPM: {_fmt(c.song.bpm)}")
+            lines.append(f"- BPM confidence: {_fmt(c.song.bpm_confidence)}")
+            lines.append(f"- Algorithm cadence: {_fmt(c.song.algorithm_cadence)}")
+            lines.append(f"- Start time: {_fmt(c.song.start_time)}")
+            lines.append(f"- Genre: {_fmt(c.song.genre)}")
+            lines.append(f"Preference score: {_fmt4(c.preference_recommendation.score)}")
+            lines.append(f"- Number of matching genres: {_fmt(c.preference_recommendation.number_of_matching_genres)}")
+            lines.append(f"- Like coefficient: {_fmt(c.preference_recommendation.like_coefficient)}")
+            lines.append(f"- Repetition coefficient: {_fmt(c.preference_recommendation.repetition_coefficient)}")
+            lines.append(f"- Skip coefficient: {_fmt(c.preference_recommendation.skip_coefficient)}")
+            lines.append(f"Interval score: {_fmt4(c.interval_recommendation.score)}")
+            lines.append(f"- Cadence score: {_fmt4(c.interval_recommendation.cadence_score)}")
+            lines.append(f"- Confidence score: {_fmt4(c.interval_recommendation.conf_score)}")
+            lines.append(f"- Song score: {_fmt4(c.interval_recommendation.song_score)}")
+            lines.append(f"FINAL SCORE: {_fmt4(c.score)}")
+            lines.append("-" * 40)
         return "\n".join(lines)
