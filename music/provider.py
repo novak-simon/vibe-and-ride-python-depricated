@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable, Optional, List, Any
 
+from workout.model import Workout
 from workout.scheduler import WorkoutScheduler
 from database.client import supabase
 from database.songs import get_playable_songs
@@ -24,6 +25,13 @@ class SongProvider:
     def has_songs(self) -> bool:
         return bool(self._songs)
 
+    def has_recommendations(self) -> bool:
+        if self.scheduler is None:
+            return False
+        if len(self._interval_recs) >= (self.scheduler.current_interval_index() + 1) + 1:
+            return True
+        return False
+
     def get_current_song(self) -> Optional[Song]:
         interval_index = self.scheduler.current_interval_index()
         if self.scheduler.workout is None:
@@ -41,17 +49,21 @@ class SongProvider:
         song = self.choose_song_for_interval(interval_index)
         return song
 
-    def precompute_recommendations(self, workout: Any) -> None:
+    def precompute_recommendations(self, workout: Workout, interval_index: int) -> None:
         """
         Precompute recommendations for each interval in the workout.
         Stores results in self._interval_recs keyed by interval index.
         Safe to call multiple times; will overwrite previous cache for this provider instance.
         """
+        print(f"Precomputing recommendations for interval {interval_index} of workout {workout.name if workout else 'None'}")
         try:
             if not workout:
                 self._interval_recs = []
                 return
-            self._interval_recs = recommend(workout)
+            if not self._interval_recs or len(self._interval_recs) <= interval_index:
+                self._interval_recs.append(None)  # Ensure the list is long enough
+            interval = workout.intervals[interval_index]
+            self._interval_recs[interval_index] = recommend(interval)
         except Exception:
             # never crash the host when precomputing; log and continue
             import logging

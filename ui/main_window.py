@@ -57,8 +57,8 @@ class MainWindow(QMainWindow):
         self._debug_button = QPushButton("Debug")
         self._debug_button.clicked.connect(self._show_current_interval_debug)
 
-        self._workout_title_label = QLabel("No workout loaded")
-        self._workout_title_label.setAlignment(Qt.AlignLeft)
+        self._workout_name_label = QLabel("No workout loaded")
+        self._workout_name_label.setAlignment(Qt.AlignLeft)
 
         self._interval_count_label = QLabel("")
         self._interval_count_label.setAlignment(Qt.AlignLeft)
@@ -109,7 +109,7 @@ class MainWindow(QMainWindow):
 
         layout = QVBoxLayout()
         layout.addLayout(top_layout)
-        layout.addWidget(self._workout_title_label)
+        layout.addWidget(self._workout_name_label)
         layout.addWidget(self._interval_count_label)
         layout.addWidget(self._interval_label)
         layout.addWidget(self._interval_detail_label)
@@ -129,7 +129,7 @@ class MainWindow(QMainWindow):
         - Show a simple chooser with workouts from DB (default).
         - Provide "Import my own workout..." option which falls back to file picker and existing import flow.
         """
-        self._workout_title_label.setText("Loading workout...")
+        self._workout_name_label.setText("Loading workout...")
         try:
             rows = self._controller.list_available_workouts()
         except Exception as exc:
@@ -143,9 +143,9 @@ class MainWindow(QMainWindow):
         id_map.append(None)
 
         for row in rows:
-            title = row.get("title") or "<unnamed>"
+            name = row.get("name") or "<unnamed>"
             author = row.get("author")
-            display = f"{title}" + (f" — {author}" if author else "")
+            display = f"{name}" + (f" — {author}" if author else "")
             choices.append(display)
             id_map.append(row.get("id"))
 
@@ -189,7 +189,7 @@ class MainWindow(QMainWindow):
                 return
 
         workout = self._controller.get_workout()
-        self._workout_title_label.setText(f"Workout: {workout.name or 'Unnamed'}")
+        self._workout_name_label.setText(f"Workout: {workout.name or 'Unnamed'}")
         self._interval_count_label.setText(f"{len(workout.intervals)} intervals")
         self._refresh_state()
         self._update_controls()

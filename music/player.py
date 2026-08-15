@@ -109,6 +109,25 @@ class MusicPlayer:
             f"backend OK, songs={len(self._songs)}"
         )
 
+    @property
+    def time_remaining(self) -> Optional[float]:
+        if self._player is None or not self._backend_available:
+            return None
+        duration_ms = self._player.duration()
+        position_ms = self._player.position()
+        if duration_ms < 0 or position_ms < 0:
+            return None
+        return (duration_ms - position_ms) / 1000.0
+
+    @property
+    def time_elapsed(self) -> Optional[float]:
+        if self._player is None or not self._backend_available:
+            return None
+        position_ms = self._player.position()
+        starting_time = self._current_song.start_time if self._current_song else 0
+        time_elapsed = position_ms / 1000.0 - starting_time
+        return time_elapsed if time_elapsed >= 0 else 0.0
+
     def get_provider(self) -> SongProvider:
         return None if self._provider is None else self._provider
 
@@ -153,6 +172,10 @@ class MusicPlayer:
         self._set_current_source(next_song)
         self._player.play()
 
+    def next_interval_soon(self) -> None:
+        self._provider.precompute_recommendations(self._provider.scheduler.workout, self._provider.scheduler.current_interval_index() + 1)
+        
+
     def _on_media_status_changed(self, status) -> None:
         logger.info("Media status changed: %s", status)
         if status is QMediaPlayer.MediaStatus.LoadedMedia:
@@ -169,4 +192,5 @@ class MusicPlayer:
         logger.error("Media player error: %s %s", error, error_string)
 
     def workout_chosen(self, workout: Workout):
-        self._provider.precompute_recommendations(workout)
+        print(f"Workout chosen: {workout.name if workout else 'None'}")
+        self._provider.precompute_recommendations(workout, self._provider.scheduler.current_interval_index())

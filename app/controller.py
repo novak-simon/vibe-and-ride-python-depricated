@@ -21,7 +21,7 @@ from database.admin_client import create_admin_supabase
 from ui.main_window import MainWindow
 from database.workouts import list_workouts, get_workout_by_id
 from database.user_song_stats import increment_stat
-from recommendation.recommender import set_recommendation_debug_sink
+from recommendation.recommender_depricated import set_recommendation_debug_sink
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +90,9 @@ class AppController:
         if state.status == WorkoutStatus.RUNNING:
             if state.interval_changed:
                 self.music_player.next_track(True)
+            if self.scheduler.current_interval().duration - self.music_player.time_elapsed < 5 and not self.music_player._provider.has_recommendations():
+                print("Precomputing recommendations for next interval")
+                self.music_player.next_interval_soon()
             self.music_player.play()
         elif state.status == WorkoutStatus.PAUSED or state.status == WorkoutStatus.NOT_STARTED:
             self.music_player.pause()
@@ -100,9 +103,9 @@ class AppController:
         """
         Initializes scheduler with valid path or workout_id.
         """
-        if not workout_id is None:
+        if workout_id is not None:
             self.scheduler.initialize(workout_id=workout_id)
-        elif not path is None:
+        elif path is not None:
             self.scheduler.initialize(path=path)
         else:
             raise ValueError("Couldn't load and prepare workout: Invalid path or workout id")

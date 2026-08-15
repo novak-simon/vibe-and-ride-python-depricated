@@ -1,6 +1,6 @@
 from typing import Any, List, Optional, TYPE_CHECKING, Union
 
-from database.methods import _extract_data, _effective_client, _is_bike_sport, _title_exists
+from database.methods import _extract_data, _effective_client, _is_bike_sport, _value_exists
 
 if TYPE_CHECKING:
     from workout.parser import ZwoNode
@@ -19,14 +19,14 @@ def upload_parsed_file(parsedFile: Union["ZwoNode", List["ZwoNode"]], client: An
     inserted_records = []
     for item in items:
         record = {
-            "title": item.get("children")[1].get("text"),
+            "name": item.get("children")[1].get("text"),
             "author": item.get("children")[0].get("text"),
             "sport_type_is_bike": _is_bike_sport(item.get("children")[3].get("text")),
             "description": item.get("children")[2].get("text"),
             "intervals": item.get("children")[5].get("children"),
         }
 
-        if _title_exists(record.get("title"), client=client):
+        if _value_exists(record.get("name"), "name", client=client):
             return
 
         response = (
@@ -48,7 +48,7 @@ def list_workouts(client: Any | None = None) -> List[dict[str, Any]]:
     Return list of workout rows from the 'workouts' table.
     """
     client = _effective_client(client)
-    response = client.table("workouts").select("*").order("title", desc=False).execute()
+    response = client.table("workouts").select("*").order("name", desc=False).execute()
     rows = _extract_data(response)
     return rows or []
 

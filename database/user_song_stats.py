@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from analysis.model import AudioAnalysis
 from user.model import UserSongStats
-from user.service import getCurrentUser
+from user.service import get_current_user
 from database.methods import _effective_client, _extract_data, _get_table, _execute_query, _song_from_record, _song_stat_from_record
 
 def get_stat_by_id(id: int, client: Any | None = None) -> Optional[UserSongStats]:
@@ -65,7 +65,7 @@ def increment_stat(stat: str, song_id: int, user_id: int | None = None, client: 
     client = _effective_client(client)
 
     if user_id is None:
-        user_id = getCurrentUser().id
+        user_id = get_current_user().id
 
     existing = get_stat_by_user_and_song_id(user_id, song_id, client=client)
     if existing is None:

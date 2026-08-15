@@ -50,7 +50,7 @@ class Workout:
         if not isinstance(parsed, dict):
             raise ValueError("Parsed workout data must be a dict")
         return cls(
-            name=parsed.get("name"),
+            name=(parsed.get("name") or parsed.get("name")),
             author=parsed.get("author"),
             sport_type=parsed.get("sport_type_is_bike"),
             tags=list(parsed.get("tags", [])),

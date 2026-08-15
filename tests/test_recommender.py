@@ -1,6 +1,6 @@
 import pytest
 from types import SimpleNamespace
-from recommendation.recommender import (
+from recommendation.recommender_depricated import (
     get_target_cadence,
     estimate_cadence_from_power,
     song_matches_user_genres,

@@ -47,7 +47,7 @@ def test_librosa_analyzer_detects_beats(tmp_path):
     assert 0.0 <= analysis.bpm_confidence <= 1.0
 
 
-def test_confidence_metric_is_application_defined():
+def test_confidence_metric_is_application_defined\n\ndef test_edge_case_silence(tmp_path):\n    path = tmp_path / 'silence.wav'\n    with wave.open(str(path), 'wb') as wf:\n        wf.setnchannels(1)\n        wf.setsampwidth(2)\n        wf.setframerate(22050)\n        wf.writeframes(b'\x00' * 22050)\n\n    analysis = LibrosaAnalyzer().analyze(str(path))\n    assert analysis.bpm is None\n    assert analysis.bpm_confidence is None():
     analyzer = LibrosaAnalyzer()
     assert analyzer._confidence_for_intervals([0.5, 0.5, 0.5]) == 1.0
     assert analyzer._confidence_for_intervals([0.5, 0.45, 0.55]) < 1.0

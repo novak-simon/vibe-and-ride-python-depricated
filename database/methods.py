@@ -52,12 +52,12 @@ def _is_bike_sport(value: Any) -> bool:
         pass
     return str(value).strip().lower() in {"bike", "bicycle", "cycling", "true", "yes", "1"}
 
-def _title_exists(title: str, client: Any | None = None) -> bool:
+def _value_exists(value: str, column: str, client: Any | None = None) -> bool:
     client = _effective_client(client)
     response = (
         client.table("workouts")
         .select("id")
-        .eq("title", title)
+        .eq(column, value)
         .limit(1)
         .execute()
     )

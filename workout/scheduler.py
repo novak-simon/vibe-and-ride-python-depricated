@@ -83,6 +83,7 @@ class WorkoutScheduler:
         if workout is None:
             raise ValueError("Workout cannot be None")
         self.workout = workout
+        print(f"Workout initialized: {self.workout.name if self.workout else 'None'}")
         self.music_player.workout_chosen(self.workout)
 
 
@@ -200,7 +201,7 @@ class WorkoutScheduler:
                 if workout_time < elapsed + interval.duration:
                     return index, interval, elapsed
                 elapsed += interval.duration
-        return 0, None, elapsed
+        return None, None, elapsed
 
     
     def _optional_float(value: Optional[float]) -> Optional[float]:
