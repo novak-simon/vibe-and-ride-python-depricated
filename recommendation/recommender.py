@@ -3,14 +3,15 @@ from realtime import dataclass
 from datetime import timedelta
 
 from database.admin_client import create_admin_supabase
-from database.songs import get_songs_around_target_cadence
+from database.songs import fetch_songs, get_songs_around_target_cadence
 from music.model import Song
+from recommendation.recommender_depricated import calculate_bpm_match
 from user.model import User
 from workout.model import Interval
 from user.service import get_current_user
 from helper_methods.model_methods import current_timestampz
 from database.user_song_stats import get_stat_by_user_and_song_id
-from recommendation.methods import _get, _clamp01, _clamp02, _safe_list, calculate_bpm_match
+from recommendation.methods import _get, _clamp01, _clamp02, get_algorithm_cadence
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,18 @@ class IntervalRecommendation():
 admin_client = create_admin_supabase()
 
 FIRST_CANDIDATE_POOL_LIMIT = 100
+
+
+def approximate_filter_by_interval(interval: Interval) -> List[Song]:
+    interval_algorithm_cadence = get_algorithm_cadence(interval.cadence)
+    pool = get_songs_around_target_cadence(admin_client, interval_algorithm_cadence, algorithm_cadence_toleration=2, limit=FIRST_CANDIDATE_POOL_LIMIT)
+    if len(pool) < FIRST_CANDIDATE_POOL_LIMIT:
+        pool.extend(get_songs_around_target_cadence(admin_client, interval_algorithm_cadence, algorithm_cadence_toleration=5, limit=FIRST_CANDIDATE_POOL_LIMIT-len(pool)))
+        if len(pool) < FIRST_CANDIDATE_POOL_LIMIT:   #Try to get songs that don't match that well, if it fails, gets at least some songs
+            pool = get_songs_around_target_cadence(admin_client, interval_algorithm_cadence, 10, limit=FIRST_CANDIDATE_POOL_LIMIT)
+            if not pool:
+                pool = fetch_songs(admin_client, limit=FIRST_CANDIDATE_POOL_LIMIT)
+    return pool
 
 def get_user_preference_score(song: Song, user: User) -> PreferenceRecommendation:
     if not user:
@@ -80,7 +93,7 @@ def get_interval_match_score(song: Song, interval: Interval) -> float:
         candidate_diffs = []
 
         if sbpm not in (None, 0):
-            match = calculate_bpm_match(sbpm, target_cadence)
+            match = calculate_bpm_match(sbpm, target_cadence, bpm_tolerance=2.0)
             if match.difference is not None:
                 candidate_diffs.append(float(match.difference))
                 if match.compatible:
@@ -217,12 +230,8 @@ def recommend(interval: Interval) -> List[Song]:
         return []
 
     user = get_current_user()  # Assuming a function to get the current user
-    first_candidate_pool = get_songs_around_target_cadence(admin_client, interval.cadence, algorithm_cadence_toleration=2, limit=FIRST_CANDIDATE_POOL_LIMIT)
-    initial_pool_size = len(first_candidate_pool)
-    if initial_pool_size < FIRST_CANDIDATE_POOL_LIMIT:
-        additive_candidates = get_songs_around_target_cadence(admin_client, interval.cadence, algorithm_cadence_toleration=5, limit=FIRST_CANDIDATE_POOL_LIMIT-initial_pool_size)
-        first_candidate_pool.extend(additive_candidates)
-    candidates = []
+    first_candidate_pool = approximate_filter_by_interval(interval)
+    candidates: List[SongRecommendation] = []
     for candidate in first_candidate_pool:
         candidates.append(get_song_recommendation_score(candidate, user, interval))
     return [rec.song for rec in sorted(candidates, key=lambda x: (-1 * x.score, -1 * x.preference_score, -1 * x.cadence_score, -1 * x.conf_score, -1 * x.song_score, x.song.id))][:10]
