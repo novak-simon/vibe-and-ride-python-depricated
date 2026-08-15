@@ -8,7 +8,7 @@ from workout.scheduler import WorkoutScheduler
 from database.client import supabase
 from database.songs import get_playable_songs
 from music.model import Song
-from recommendation.recommender import recommend, Recommendation  # new dependency
+from recommendation.recommender import recommend, SongRecommendation  # new dependency
 
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".ogg", ".flac", ".m4a"}
 
@@ -28,8 +28,10 @@ class SongProvider:
     def has_recommendations(self) -> bool:
         if self.scheduler is None:
             return False
-        if len(self._interval_recs) >= (self.scheduler.current_interval_index() + 1) + 1:
+        elif len(self._interval_recs) >= (self.scheduler.current_interval_index() + 1) + 1:
             return True
+        elif self.scheduler.current_interval_index() + 1 >= len(self.scheduler.workout.intervals):
+            return True  # No next interval, so no recommendations needed
         return False
 
     def get_current_song(self) -> Optional[Song]:
@@ -55,15 +57,19 @@ class SongProvider:
         Stores results in self._interval_recs keyed by interval index.
         Safe to call multiple times; will overwrite previous cache for this provider instance.
         """
-        print(f"Precomputing recommendations for interval {interval_index} of workout {workout.name if workout else 'None'}")
+        
         try:
             if not workout:
                 self._interval_recs = []
                 return
+            elif interval_index >= len(workout.intervals):
+                return  # Invalid interval index; do nothing
             if not self._interval_recs or len(self._interval_recs) <= interval_index:
                 self._interval_recs.append(None)  # Ensure the list is long enough
             interval = workout.intervals[interval_index]
+            print(f"Precomputing recommendations for interval {interval_index} of workout {workout.name if workout else 'None'}")
             self._interval_recs[interval_index] = recommend(interval)
+            print(f"Precomputed {len(self._interval_recs[interval_index])} recommendations for interval {interval_index}")
         except Exception:
             # never crash the host when precomputing; log and continue
             import logging

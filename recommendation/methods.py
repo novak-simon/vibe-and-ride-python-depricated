@@ -1,7 +1,7 @@
 from typing import Any, Optional
 from dataclasses import dataclass
 
-from setuptools import logging
+import logging
 logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)

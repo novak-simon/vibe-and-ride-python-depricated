@@ -25,7 +25,7 @@ from recommendation.recommender_depricated import set_recommendation_debug_sink
 
 logger = logging.getLogger(__name__)
 
-
+TIME_FOR_PRECOMPUTATION = 10  # seconds before interval end to precompute next interval recommendations
 
 class AppController:
     def __init__(self):
@@ -90,7 +90,7 @@ class AppController:
         if state.status == WorkoutStatus.RUNNING:
             if state.interval_changed:
                 self.music_player.next_track(True)
-            if self.scheduler.current_interval().duration - self.music_player.time_elapsed < 5 and not self.music_player._provider.has_recommendations():
+            if self.scheduler.current_interval().duration - self.music_player.time_elapsed < TIME_FOR_PRECOMPUTATION and not self.music_player._provider.has_recommendations():
                 print("Precomputing recommendations for next interval")
                 self.music_player.next_interval_soon()
             self.music_player.play()

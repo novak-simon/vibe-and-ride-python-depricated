@@ -5,13 +5,12 @@ from datetime import timedelta
 from database.admin_client import create_admin_supabase
 from database.songs import fetch_songs, get_songs_around_target_cadence
 from music.model import Song
-from recommendation.recommender_depricated import calculate_bpm_match
 from user.model import User
 from workout.model import Interval
 from user.service import get_current_user
 from helper_methods.model_methods import current_timestampz
 from database.user_song_stats import get_stat_by_user_and_song_id
-from recommendation.methods import _get, _clamp01, _clamp02, get_algorithm_cadence
+from recommendation.methods import _get, _clamp01, _clamp02, get_algorithm_cadence, calculate_bpm_match
 
 
 @dataclass(frozen=True)
