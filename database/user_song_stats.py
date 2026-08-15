@@ -57,10 +57,10 @@ def get_stats_by_user_id(user_id: int, limit: int = 50, client: Any | None = Non
     records = _extract_data(response)
     return [_song_stat_from_record(record) for record in records]
 
-def increment_skip_count(song_id: int, user_id: int | None = None, client: Any | None = None) -> Optional[UserSongStats]:
+def increment_stat(stat: str, song_id: int, user_id: int | None = None, client: Any | None = None) -> Optional[UserSongStats]:
     """
-    Increments `skip_count` for the given song for the current user or provided user.
-    If no stat row exists yet, creates one with skip_count = 1.
+    Increments the specified statistic for the given song for the current user or provided user.
+    If no stat row exists yet, creates one with the statistic set to 1.
     """
     client = _effective_client(client)
 
@@ -74,17 +74,17 @@ def increment_skip_count(song_id: int, user_id: int | None = None, client: Any |
             .insert({
                 "user_id": user_id,
                 "song_id": song_id,
-                "skip_count": 1,
+                stat: 1,
             })
             .execute()
         )
         records = _extract_data(response)
         return _song_stat_from_record(records[0]) if records else None
 
-    new_skip_count = (getattr(existing, "skip_count", 0) or 0) + 1
+    new_stat_value = (getattr(existing, stat, 0) or 0) + 1
     response = (
         client.table("user_song_stats")
-        .update({"skip_count": new_skip_count})
+        .update({stat: new_stat_value})
         .eq("user_id", user_id)
         .eq("song_id", song_id)
         .execute()

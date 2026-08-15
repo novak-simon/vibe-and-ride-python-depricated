@@ -20,7 +20,7 @@ from music.player import MusicPlayer
 from database.admin_client import create_admin_supabase
 from ui.main_window import MainWindow
 from database.workouts import list_workouts, get_workout_by_id
-from database.user_song_stats import increment_skip_count
+from database.user_song_stats import increment_skip_count, increment_stat
 from recommendation.recommender import set_recommendation_debug_sink
 
 logger = logging.getLogger(__name__)
@@ -89,9 +89,10 @@ class AppController:
         state = self.get_workout_state()
         if state.status == WorkoutStatus.RUNNING:
             if state.interval_changed:
-                print('Tady bych snad mel byt')
                 self.music_player.next_track(True)
             self.music_player.play()
+            if self.music_player.current_song().duration / 10 < self.music_player.current_song().position:
+                increment_stat(stat="play_count", song_id=self.music_player.current_song().id, user_id=None, client=self.admin_client)
         elif state.status == WorkoutStatus.PAUSED or state.status == WorkoutStatus.NOT_STARTED:
             self.music_player.pause()
         else:
@@ -137,5 +138,5 @@ class AppController:
         return interval_items[idx]
 
     def skip(self) -> None:
-        increment_skip_count(song_id=self.music_player.current_song().id, user_id=None, client=self.admin_client)
+        increment_stat(stat="skip_count", song_id=self.music_player.current_song().id, user_id=None, client=self.admin_client)
         self.music_player.next_track()
