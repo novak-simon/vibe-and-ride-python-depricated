@@ -12,6 +12,8 @@ except ImportError as exc:
     QUrl = QAudioOutput = QMediaPlayer = None
     _PYSIDE6_MULTIMEDIA_ERROR = exc
 
+from database.user_song_stats import increment_stat
+from database.admin_client import create_admin_supabase
 from music.model import Song
 from music.provider import SongProvider
 from workout.scheduler import WorkoutScheduler
@@ -37,6 +39,7 @@ class MusicPlayer:
             and QUrl is not None
         )
         self._end_of_media_status = None
+        self.admin_client = create_admin_supabase()
 
         if not self._backend_available:
             logger.warning(
@@ -157,6 +160,7 @@ class MusicPlayer:
             print(f"Song: {self._current_song.title}, ID: {self._current_song.id}, BPM: {self._current_song.bpm}, Genre: {self._current_song.genre}, Start time: {self._current_song.start_time}")
             print(f"Start time planned: {self._current_song.start_time}")
             self._player.setPosition(int(self._current_song.start_time * 1000))
+            increment_stat(stat="play_count", song_id=self.current_song().id, user_id=None, client=self.admin_client)
             print(f"Position {self._player.position()}")
         if self._end_of_media_status is not None and status == self._end_of_media_status:
             self.next_track()
