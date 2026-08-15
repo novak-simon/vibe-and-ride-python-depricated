@@ -124,13 +124,8 @@ class MusicPlayer:
         if hasattr(self._player, "setSource"):
             self._player.setSource(source)
 
-    def current_song_name(self) -> Optional[str]:
-        song = self._provider.get_current_song()
-        if song is None or not song.title:
-            return None
-        if song.artist:
-            return f"{song.title} — {song.artist}"
-        return song.title
+    def current_song(self) -> Optional[Song]:
+        return self._current_song
 
     def play(self) -> None:
         if not self.available or self._player is None:

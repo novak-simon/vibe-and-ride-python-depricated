@@ -46,9 +46,9 @@ class UserSongStats:
             is_liked=bool(data.get("is_liked")),
             play_count=_optional_int(data.get("play_count")),
             skip_count=_optional_int(data.get("skip_count")),
-            first_played_at=datetime.fromisoformat(data.get("first_played_at")),
-            last_played_at=datetime.fromisoformat(data.get("last_played_at")),
-            last_skipped_at=datetime.fromisoformat(data.get("last_skipped_at")),
+            first_played_at=datetime.fromisoformat(_optional_str(data.get("first_played_at"))) if data.get("first_played_at") else None,
+            last_played_at=datetime.fromisoformat(_optional_str(data.get("last_played_at"))) if data.get("last_played_at") else None,
+            last_skipped_at=datetime.fromisoformat(_optional_str(data.get("last_skipped_at"))) if data.get("last_skipped_at") else None,
             total_play_time=_optional_int(data.get("total_play_time")),
         )
 

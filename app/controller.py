@@ -20,6 +20,7 @@ from music.player import MusicPlayer
 from database.admin_client import create_admin_supabase
 from ui.main_window import MainWindow
 from database.workouts import list_workouts, get_workout_by_id
+from database.user_song_stats import increment_skip_count
 from recommendation.recommender import set_recommendation_debug_sink
 
 logger = logging.getLogger(__name__)
@@ -49,8 +50,8 @@ class AppController:
     def get_music_player(self) -> MusicPlayer:
         return self.music_player
 
-    def get_current_song_name(self) -> str|None:
-        return self.music_player.current_song_name()
+    def get_current_song_title(self) -> str|None:
+        return self.music_player.current_song().title if self.music_player.current_song() is not None else None
 
     def is_music_available(self) -> bool:
         return self.music_player.available
@@ -134,3 +135,7 @@ class AppController:
         if idx < 0 or idx >= len(interval_items):
             return None
         return interval_items[idx]
+
+    def skip(self) -> None:
+        increment_skip_count(song_id=self.music_player.current_song().id, user_id=None, client=self.admin_client)
+        self.music_player.next_track()
