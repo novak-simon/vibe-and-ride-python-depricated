@@ -1,5 +1,4 @@
 from bisect import bisect_right
-from statistics import mean
 from typing import Any, List
 from analysis.model import AudioAnalysis
 from music.model import Song
@@ -33,6 +32,17 @@ class StartTimeAnalyzer:
             sorted_list = [v[0] for v in sorted_list]
         i = bisect_right(sorted_list, value)
         return round(sorted_list[i - 1], 2) if i > 0 else None
+
+    def _wave_to_diff(self, wave: int) -> float:
+        """
+        Converts waveform value to a difference value
+        """
+        if wave < 46.875:
+            return -5/(wave-50)
+        elif wave < 68.125:
+            return 8/25*(wave-(335/8))
+        else:
+            return (-5/(wave-65)) + 10
 
 
     def _create_blocks(self, from_list: List[tuple], max_diff: float, compare: bool = False) -> List[tuple]:
@@ -74,24 +84,44 @@ class StartTimeAnalyzer:
 
     def _zoom_in(self, input_list: List[Any], output_list: List[Any], input_interval_length: float, minus: int, plus: int) -> List[Any]:
         # Implementation for zooming in on specific intervals
-        index = int(round(input_list[0][1]/input_interval_length))
+        index = int(round(input_list[0][1]/input_interval_length)) - 1
+        print(f"Zooming in on index: {index}, minus: {minus}, plus: {plus}")
         candidates = []
-        max_diff = [0, None]
-        for idx, val in enumerate(output_list[index-minus:index+plus+1]):
+        max_diff = [0, 0]
+        alt_max_diff = [0, 0]
+        lower_bound = max(0, index - minus)
+        upper_bound = min(len(output_list) - 1, index + plus)
+        for idx, val in enumerate(output_list[lower_bound:upper_bound + 1]):
+            print(f"Index: {lower_bound + idx}, Value: {val}")
             if isinstance(val, int):
-                diff = round(abs(val - output_list[index-minus-1:index+plus][idx]), 2)
-                val = (val, index-minus+idx)
+                if lower_bound > 0:
+                    diff = round(abs(val - output_list[lower_bound - 1:upper_bound][idx]), 2)
+                else:
+                    if idx > 0:
+                        diff = round(abs(val - output_list[lower_bound:upper_bound + 1][idx - 1]), 2)
+                    else:
+                        diff = 0
+                val = (val, lower_bound + idx)
             else:
-                diff = round(abs(val[0] - output_list[index-minus-1:index+plus][idx][0]), 2)
+                if lower_bound > 0:
+                    diff = round(abs(val[0] - output_list[lower_bound - 1:upper_bound][idx][0]), 2)
+                else:
+                    if idx > 0:
+                        diff = round(abs(val[0] - output_list[lower_bound:upper_bound + 1][idx - 1][0]), 2)
+                    else:
+                        diff = 0
             candidates.append(val)
-            if diff > max_diff[0] + 5:
+            if diff > max_diff[0] + self._wave_to_diff(val[0]):
                 max_diff = [diff, idx]
-        
+            if diff > alt_max_diff[0]:
+                alt_max_diff = [diff, idx]
+        print(f"Max diff: {max_diff}, Alt max diff: {alt_max_diff}")
+        if max_diff is None or max_diff[0] == 0:
+            max_diff = alt_max_diff
         if max_diff[1] - 1 >= 0:
             chosen = [candidates[max_diff[1] - 1], candidates[max_diff[1]]]
         else:
-            chosen_upper_index = index - minus + max_diff[1]
-            chosen = [(output_list[chosen_upper_index - 1], (output_list[chosen_upper_index - 1], candidates[max_diff[1]][1]-1)), (output_list[chosen_upper_index], candidates[max_diff[1]])]
+            chosen = [candidates[max_diff[1]]]
         return chosen
 
     def analyze(self, song: Song, beatnet_analysis: AudioAnalysis, librosa_analysis: AudioAnalysis) -> float:
@@ -104,17 +134,17 @@ class StartTimeAnalyzer:
 
         # Groups waveforms into groups of 10 (approximately 2 seconds) and for each group takes the average waveform
         values_grouped, grouped_length = self._group_waveforms(song, 10)
-
+        print(f"Grouped waveforms: {values_grouped}, grouped length: {grouped_length}")
         # Goes through grouped values and compares each value to the average of the current forming group, when too distinct, adds current forming group to new list and starts forming new group
         small_blocks = self._create_blocks(values_grouped, 5, compare=False)   #5
-
+        print(f"Small blocks: {small_blocks}")
         medium_blocks = self._create_blocks(small_blocks, 10, compare=True)
-
+        print(f"Medium blocks: {medium_blocks}")
         grouped_chosen = self._zoom_in(medium_blocks, values_grouped, grouped_length, 2, 2)
-
-        wave_length = song.duration/len(song.waveform)
+        print(f"Grouped chosen: {grouped_chosen}")
+        wave_length = float(song.duration/len(song.waveform))
         wave_chosen = self._zoom_in(grouped_chosen, song.waveform, wave_length, 9, 10)
-        wave_chosen_index = wave_chosen[0][1]
+        wave_chosen_index = int(wave_chosen[0][1])
         waveform_based_start_time = round(wave_chosen_index * wave_length, 2)
         used_analysis = beatnet_analysis if beatnet_analysis.bpm_confidence and (not librosa_analysis.bpm_confidence or beatnet_analysis.bpm_confidence > librosa_analysis.bpm_confidence) else librosa_analysis
         if used_analysis is beatnet_analysis:

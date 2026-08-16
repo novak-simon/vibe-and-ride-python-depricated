@@ -36,8 +36,16 @@ class LibrosaAnalyzer:
             float(beats[i + 1] - beats[i]) for i in range(len(beats) - 1)
         ]
         processed_intervals = self._remove_anomalies(beat_intervals)
-        calculated_bpm = 60 / np.mean(processed_intervals)
-        alternative_bpm = 60 / np.median(beat_intervals)
+        if processed_intervals:
+            calculated_bpm = 60 / np.mean(processed_intervals)
+            alternative_bpm = 60 / np.median(beat_intervals)
+        elif beat_intervals:
+            calculated_bpm = 60 / np.mean(beat_intervals)
+            alternative_bpm = 60 / np.median(beat_intervals)
+        else:
+            calculated_bpm = 0
+            alternative_bpm = 0
+        
         bpm.append(calculated_bpm)
         bpm.append(alternative_bpm)
         final_bpm_estimate = int(round(np.nan_to_num(np.nanmean(bpm))))
@@ -68,6 +76,8 @@ class LibrosaAnalyzer:
 
     @staticmethod
     def _remove_anomalies(intervals: List[float]) -> List[float]:
+        if not intervals:
+            return []
         std_interval = float(np.std(intervals, ddof=0))
         mean_interval = float(np.mean(intervals))
         if mean_interval <= 0:
