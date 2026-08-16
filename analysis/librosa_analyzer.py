@@ -41,8 +41,8 @@ class LibrosaAnalyzer:
         bpm.append(calculated_bpm)
         bpm.append(alternative_bpm)
         final_bpm_estimate = int(round(np.nan_to_num(np.nanmean(bpm))))
-        print(f"Librosa BPM: {final_bpm_estimate}")
-        print(f"Librosa confidence: {self._confidence_for_intervals(beat_intervals)}")
+        #print(f"Librosa BPM: {final_bpm_estimate}")
+        #print(f"Librosa confidence: {self._confidence_for_intervals(beat_intervals)}")
         
 
         return AudioAnalysis(

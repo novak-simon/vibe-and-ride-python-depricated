@@ -37,7 +37,6 @@ class BeatnetAnalyzer:
         save_in_downloads_as(output, "beatnet_output")
 
         beats = [(float(t), int(p)) for t, p in output]
-        print(f"BeatNet beat times: {beats}, type: {type(beats)}")
 
         
         bpm_candidates: List[float] = []
@@ -65,8 +64,8 @@ class BeatnetAnalyzer:
             bpm_candidates.append(alternative_bpm)
 
         final_bpm_estimate = round(float(np.mean(bpm_candidates))) if bpm_candidates else None
-        print(f"Beatnet BPM: {final_bpm_estimate}")
-        print(f"Beatnet confidence: {self._confidence_for_intervals(filtered_intervals)}")
+        # print(f"Beatnet BPM: {final_bpm_estimate}")
+        # print(f"Beatnet confidence: {self._confidence_for_intervals(filtered_intervals)}")
 
         return AudioAnalysis(
             bpm=final_bpm_estimate,

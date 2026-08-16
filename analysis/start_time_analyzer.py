@@ -64,7 +64,6 @@ class StartTimeAnalyzer:
         i = 0
         waveforms = len(song.waveform)
         grouped_length = song.duration/waveforms*group_size
-        print(f"Length grouped: {grouped_length}")
         for val in song.waveform:
             i += 1
             temp.add(val)
@@ -79,25 +78,20 @@ class StartTimeAnalyzer:
         candidates = []
         max_diff = [0, None]
         for idx, val in enumerate(output_list[index-minus:index+plus+1]):
-            print(idx)
             if isinstance(val, int):
                 diff = round(abs(val - output_list[index-minus-1:index+plus][idx]), 2)
                 val = (val, index-minus+idx)
             else:
                 diff = round(abs(val[0] - output_list[index-minus-1:index+plus][idx][0]), 2)
             candidates.append(val)
-            print(f"Candidate: {val}, diff: {diff}, max_diff: {max_diff[0]} at index {max_diff[1]}")
             if diff > max_diff[0] + 5:
                 max_diff = [diff, idx]
-        print(f"Candidates: {candidates}")
-        print(f"Max diff: {max_diff[0]} at index {max_diff[1]}")
         
         if max_diff[1] - 1 >= 0:
             chosen = [candidates[max_diff[1] - 1], candidates[max_diff[1]]]
         else:
             chosen_upper_index = index - minus + max_diff[1]
             chosen = [(output_list[chosen_upper_index - 1], (output_list[chosen_upper_index - 1], candidates[max_diff[1]][1]-1)), (output_list[chosen_upper_index], candidates[max_diff[1]])]
-        print(f"Grouped chosen: {chosen}")
         return chosen
 
     def analyze(self, song: Song, beatnet_analysis: AudioAnalysis, librosa_analysis: AudioAnalysis) -> float:
@@ -110,28 +104,22 @@ class StartTimeAnalyzer:
 
         # Groups waveforms into groups of 10 (approximately 2 seconds) and for each group takes the average waveform
         values_grouped, grouped_length = self._group_waveforms(song, 10)
-        print(f"Values grouped: {values_grouped}")
 
         # Goes through grouped values and compares each value to the average of the current forming group, when too distinct, adds current forming group to new list and starts forming new group
         small_blocks = self._create_blocks(values_grouped, 5, compare=False)   #5
-        print(f"Small blocks: {small_blocks}")
 
         medium_blocks = self._create_blocks(small_blocks, 10, compare=True)
-        print(f"Medium blocks: {medium_blocks}")
 
         grouped_chosen = self._zoom_in(medium_blocks, values_grouped, grouped_length, 2, 2)
 
         wave_length = song.duration/len(song.waveform)
         wave_chosen = self._zoom_in(grouped_chosen, song.waveform, wave_length, 9, 10)
-        print(f"Wave chosen: {wave_chosen}")
         wave_chosen_index = wave_chosen[0][1]
         waveform_based_start_time = round(wave_chosen_index * wave_length, 2)
-        print(f"Start time: {waveform_based_start_time}")
         used_analysis = beatnet_analysis if beatnet_analysis.bpm_confidence and (not librosa_analysis.bpm_confidence or beatnet_analysis.bpm_confidence > librosa_analysis.bpm_confidence) else librosa_analysis
         if used_analysis is beatnet_analysis:
             timestamps = [t[0] for t in beatnet_analysis.beat_timestamps]
         else:
             timestamps = librosa_analysis.beat_timestamps
         start_time = self._closest_lower(timestamps, waveform_based_start_time)
-        print(f"Start time based on analysis: {start_time}")
         return start_time if start_time is not None else waveform_based_start_time
