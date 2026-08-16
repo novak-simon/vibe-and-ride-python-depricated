@@ -110,6 +110,37 @@ def jamendo_result_to_song(result: Dict[str, Any]) -> Song:
     result["jamendo_id"] = result.pop("id")
     result["title"] = result.pop("name")
     result["artist"] = result.pop("artist_name")
+    license_ccurl = str(result.get("license_ccurl"))
+    if "creativecommons.org" in license_ccurl:
+        if "nc" in license_ccurl:
+            result["license_nc"] = True
+        else:
+            result["license_nc"] = False
+        if "sa" in license_ccurl:
+            result["license_sa"] = True
+        else:
+            result["license_sa"] = False
+        if "nd" in license_ccurl:
+            result["license_nd"] = True
+        else:
+            result["license_nd"] = False
+        if "4.0" in license_ccurl:
+            result["license_version"] = 4.0
+        elif "3.0" in license_ccurl:
+            result["license_version"] = 3.0
+        elif "2.5" in license_ccurl:
+            result["license_version"] = 2.5
+        elif "2.0" in license_ccurl:
+            result["license_version"] = 2.0
+        elif "1.0" in license_ccurl:
+            result["license_version"] = 1.0
+        else:
+            result["license_version"] = None
+    else:
+        result["license_nc"] = None
+        result["license_sa"] = None
+        result["license_nd"] = None
+        result["license_version"] = None
 
     musicinfo = result.get("musicinfo") or {}
     if not isinstance(musicinfo, dict):

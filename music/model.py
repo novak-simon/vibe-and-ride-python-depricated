@@ -11,6 +11,7 @@ class Song:
     jamendo_id: Optional[str] = None
     id: Optional[int] = None
     artist: Optional[str] = None
+    release_date: Optional[str] = None
     genre: List[str] = None
     instruments: List[str] = None
     vartags: List[str] = None
@@ -28,10 +29,16 @@ class Song:
     waveform: List[int] = None
     image: Optional[str] = None
     shareurl: Optional[str] = None
+    license_ccurl: Optional[str] = None
+    content_id_free: Optional[bool] = None
     lang: Optional[str] = None
     gender: Optional[str] = None
     is_instrumental: Optional[bool] = None
     is_electric: Optional[bool] = None
+    license_nd: Optional[bool] = None
+    license_sa: Optional[bool] = None
+    license_nc: Optional[bool] = None
+    license_version: Optional[float] = None
 
 
     @classmethod
@@ -44,6 +51,7 @@ class Song:
             genre=_str_to_list(data.get("genre")),
             instruments=_str_to_list(data.get("instruments")),
             vartags=_str_to_list(data.get("vartags")),
+            release_date=_optional_str(data.get("release_date")),
             duration=_optional_int(data.get("duration")),
             speed=_optional_int(data.get("speed"), default=0),
             bpm=_optional_int(data.get("bpm"), default=0),
@@ -57,10 +65,17 @@ class Song:
             waveform=_str_to_list(data.get("waveform")),
             image=_optional_str(data.get("image")),
             shareurl=_optional_str(data.get("shareurl")),
+            license_ccurl=_optional_str(data.get("license_ccurl")),
             lang=_optional_str(data.get("lang")),
             gender=_optional_str(data.get("gender")),
             is_instrumental=bool(data.get("is_instrumental")),
             is_electric=bool(data.get("is_electric")),
+            content_id_free=bool(data.get("content_id_free")),
+            license_nd=bool(data.get("license_nd")),
+            license_sa=bool(data.get("license_sa")),
+            license_nc=bool(data.get("license_nc")),
+            license_version=_optional_float(data.get("license_version")),
+
         )
 
     def to_record(self) -> Dict[str, Any]:
@@ -68,6 +83,7 @@ class Song:
             "title": self.title,
             "jamendo_id": self.jamendo_id,
             "artist": self.artist,
+            "release_date": self.release_date,
             "genre": self.genre,
             "duration": self.duration,
             "speed": self.speed,
@@ -82,12 +98,18 @@ class Song:
             "waveform": self.waveform,
             "image": self.image,
             "shareurl": self.shareurl,
+            "license_ccurl": self.license_ccurl,
             "vartags": self.vartags,
             "instruments": self.instruments,
             "lang": self.lang,
             "gender": self.gender,
             "is_instrumental": self.is_instrumental,
             "is_electric": self.is_electric,
+            "content_id_free": self.content_id_free,
+            "license_nd": self.license_nd,
+            "license_sa": self.license_sa,
+            "license_nc": self.license_nc,
+            "license_version": self.license_version,
         }
 
 
