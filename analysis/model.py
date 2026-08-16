@@ -9,6 +9,7 @@ class AudioAnalysis:
     bpm: int
     bpm_confidence: Optional[int]
     beat_intervals: List[float]
+    beat_timestamps: List[float]|List[tuple[float, int]]
     start_time: float = 0
 
     def to_record(self) -> Dict[str, Any]:
@@ -16,5 +17,6 @@ class AudioAnalysis:
             "bpm": self.bpm,
             "bpm_confidence": self.bpm_confidence,
             "beat_intervals": self.beat_intervals,
+            "beat_timestamps": self.beat_timestamps,
             "start_time": self.start_time,
         }

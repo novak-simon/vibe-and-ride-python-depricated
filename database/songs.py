@@ -125,6 +125,7 @@ def update_song_analysis(client, song_id: int, analysis: AudioAnalysis) -> None:
         "bpm": analysis.bpm,
         "beat_intervals": analysis.beat_intervals,
         "bpm_confidence": analysis.bpm_confidence,
+        "beat_timestamps": analysis.beat_timestamps,
         "start_time": analysis.start_time,
     }
     query = table.update(record).eq("id", song_id)

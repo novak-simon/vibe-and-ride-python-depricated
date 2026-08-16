@@ -36,77 +36,21 @@ class BeatnetAnalyzer:
         output = estimator.process(audio_path)
         save_in_downloads_as(output, "beatnet_output")
 
-        beat_times: List[float] = []
+        beats = [(float(t), int(p)) for t, p in output]
+        print(f"BeatNet beat times: {beats}, type: {type(beats)}")
+
+        
         bpm_candidates: List[float] = []
-
-        def to_seconds(values: Any) -> List[float]:
-            if values is None:
-                return []
-            if isinstance(values, dict):
-                vals: List[float] = []
-                for v in values.values():
-                    vals.extend(to_seconds(v))
-                return vals
-            if isinstance(values, (list, tuple, np.ndarray)):
-                vals: List[float] = []
-                for v in values:
-                    vals.extend(to_seconds(v))
-                return vals
-            try:
-                fv = float(values)
-            except Exception:
-                return []
-            if fv > 1e4 and sr and fv > sr:
-                return [fv / sr]
-            return [fv]
-
-        if isinstance(output, dict):
-            for key in (
-                "beats",
-                "beat_times",
-                "Beat_times",
-                "onsets",
-                "onset_times",
-                "beats_seconds",
-                "beat_positions",
-                "beat_samples",
-                "beat_frames",
-                "beats_idx",
-                "beat_idx",
-            ):
-                if key in output:
-                    beat_times = to_seconds(output[key])
-                    if beat_times:
-                        break
-            if not beat_times:
-                for value in output.values():
-                    beat_times = to_seconds(value)
-                    if beat_times:
-                        break
-
-            for tempo_key in ("tempo", "bpm", "estimated_tempo", "tempo_estimate"):
-                if tempo_key in output:
-                    tempo_val = output[tempo_key]
-                    if isinstance(tempo_val, (list, tuple, np.ndarray)):
-                        bpm_candidates.extend(
-                            [float(t) for t in tempo_val if t is not None]
-                        )
-                    else:
-                        try:
-                            bpm_candidates.append(float(tempo_val))
-                        except Exception:
-                            pass
-        else:
-            beat_times = to_seconds(output)
-
+        
+        beat_times = [float(b[0]) for b in sorted(beats, key=lambda x: x[0])]
         if len(beat_times) == 0 and not bpm_candidates:
-            raise RuntimeError("BeatNet produced no beats for the given audio")
-
-        beat_times = [float(b) for b in sorted(beat_times)]
+            raise RuntimeError("BeatNet produced no beats for the given audio")        
+        
         beat_intervals = [
             float(beat_times[i + 1] - beat_times[i])
             for i in range(len(beat_times) - 1)
         ]
+        
         filtered_intervals = []
         for interval in beat_intervals:
             if not interval == 0:
@@ -128,6 +72,7 @@ class BeatnetAnalyzer:
             bpm=final_bpm_estimate,
             bpm_confidence=self._confidence_for_intervals(filtered_intervals),
             beat_intervals=filtered_intervals,
+            beat_timestamps=beats,
         )
 
     @staticmethod

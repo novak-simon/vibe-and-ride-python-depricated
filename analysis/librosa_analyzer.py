@@ -49,6 +49,7 @@ class LibrosaAnalyzer:
             bpm=final_bpm_estimate,
             bpm_confidence=self._confidence_for_intervals(beat_intervals),
             beat_intervals=beat_intervals,
+            beat_timestamps=beats,
         )
 
     @staticmethod
