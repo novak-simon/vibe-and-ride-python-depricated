@@ -110,10 +110,6 @@ class AppController:
         else:
             raise ValueError("Couldn't load and prepare workout: Invalid path or workout id")
 
-    def list_available_workouts(self):
-        return list_workouts(self.admin_client)
-
-
     def get_current_interval_debug_info(self) -> List[SongRecommendation]|None:
         """
         Returns the debug information for the current interval's recommendations, if available.

@@ -14,7 +14,7 @@ AUDIO_EXTENSIONS = {".mp3", ".wav", ".ogg", ".flac", ".m4a"}
 
 
 class SongProvider:
-    def __init__(self, scheduler=WorkoutScheduler, client=None) -> None:
+    def __init__(self, scheduler=None, client=None) -> None:
         self._client = client or supabase
         self._songs: List[Song] = []
         self._current_index = -1
@@ -28,6 +28,8 @@ class SongProvider:
 
     def has_recommendations(self) -> bool:
         if self.scheduler is None:
+            return False
+        elif self.scheduler.current_interval_index() is None:
             return False
         elif len(self._interval_recs) >= (self.scheduler.current_interval_index() + 1) + 1:
             return True

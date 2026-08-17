@@ -22,7 +22,6 @@ class Song:
     beat_intervals: Optional[List[float]] = None
     audio_url: Optional[str] = None
     download_url: Optional[str] = None
-    beat_intervals: Optional[List[float]] = None
     start_time: float = 0
     algorithm_cadence: int = 0
     algorithm_power: int = 60

@@ -62,14 +62,17 @@ def get_user_preference_score(song: Song, user: User) -> PreferenceRecommendatio
     number_of_matching_genres: float = len(set(song.genre) & set(user.genre_preferences)) if song.genre else 0.5
     stat = get_stat_by_user_and_song_id(user.id, song.id, admin_client)
     if stat:
-        since_last_played = current_timestampz() - stat.last_played_at
-        if since_last_played < timedelta(hours=1):
-            return PreferenceRecommendation(song=song, score=-1.0, user=user, number_of_matching_genres=number_of_matching_genres, repetition_coefficient=-1.0, like_coefficient="N/A", skip_coefficient="N/A")
+        if stat.last_played_at is not None:
+            since_last_played = current_timestampz() - stat.last_played_at
+            if since_last_played < timedelta(hours=1):
+                return PreferenceRecommendation(song=song, score=-1.0, user=user, number_of_matching_genres=number_of_matching_genres, repetition_coefficient=-1.0, like_coefficient="N/A", skip_coefficient="N/A")
+            else:
+                repetition_coefficient = min(2, since_last_played/timedelta(days=2))
         else:
-            repetition_coefficient = min(2, since_last_played/timedelta(days=2))
+            repetition_coefficient = 2.0
         like_coefficient = 2 if stat.is_liked is True else 1
         if not stat.skip_count == 0:
-            skip_coefficient = min(2, stat.play_count/3*stat.skip_count)
+            skip_coefficient = min(2, stat.play_count/(3*stat.skip_count))
         else:
             skip_coefficient = 2
         score = number_of_matching_genres * repetition_coefficient * like_coefficient * skip_coefficient #Max 8

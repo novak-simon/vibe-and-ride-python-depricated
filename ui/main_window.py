@@ -88,7 +88,7 @@ class MainWindow(QMainWindow):
         self._pause_button.clicked.connect(self._toggle_pause_resume)
 
         self._skip_button = QPushButton("SKIP")
-        self._skip_button.clicked.connect(self._skip_workout)
+        self._skip_button.clicked.connect(self._controller.skip)
 
         self._reset_button = QPushButton("Reset")
         self._reset_button.clicked.connect(self._reset_workout)
@@ -196,10 +196,6 @@ class MainWindow(QMainWindow):
         self._update_controls()
 
     def _start_workout(self) -> None:
-        if not self._controller.is_workout_available():
-            QMessageBox.warning(self, "No workout", "Please load a workout before starting.")
-            return
-
         # keep UI responsibilities only; start scheduling via scheduler object
         self._controller.start_workout()
         self._timer.start(200)
@@ -207,9 +203,6 @@ class MainWindow(QMainWindow):
         self._update_controls()
 
     def _toggle_pause_resume(self) -> None:
-        if not self._controller.is_workout_available():
-            return
-
         if self._controller.get_workout_state().status is WorkoutStatus.RUNNING:
             try:
                 self._controller.pause()
@@ -225,25 +218,13 @@ class MainWindow(QMainWindow):
         self._refresh_state()
         self._update_controls()
 
-    def _skip_workout(self) -> None:
-        if not self._controller.is_workout_available():
-            return
-        self._controller.skip()
-
     def _reset_workout(self) -> None:
-        if not self._controller.is_workout_available():
-            return
-
         self._controller.reset()
         self._timer.start(200)
         self._refresh_state()
         self._update_controls()
 
     def _resync_workout(self) -> None:
-        if not self._controller.is_workout_available():
-            QMessageBox.warning(self, "No workout", "Please load a workout before resynchronizing.")
-            return
-
         total_duration = self._controller.get_workout().total_duration
         value, ok = QInputDialog.getDouble(
             self,
@@ -268,11 +249,6 @@ class MainWindow(QMainWindow):
         self._update_controls()
 
     def _refresh_state(self) -> None:
-        if not self._controller.is_workout_available():
-            self._status_label.setText("Status: no workout loaded")
-            self._update_controls()
-            return
-        
         self._controller.refresh_state()
         workout = self._controller.get_workout()
         state = self._controller.get_workout_state()
@@ -323,17 +299,13 @@ class MainWindow(QMainWindow):
         return " · ".join(parts)
 
     def _update_controls(self) -> None:
-        has_workout = self._controller.is_workout_available()
         status = self._controller.get_workout_state().status
         self._load_button.setEnabled(True)
-        self._start_button.setEnabled(has_workout and status is WorkoutStatus.NOT_STARTED)
+        self._start_button.setEnabled(status is WorkoutStatus.NOT_STARTED)
 
-        self._skip_button.setEnabled(has_workout)
+        self._skip_button.setEnabled(status in (WorkoutStatus.RUNNING, WorkoutStatus.PAUSED))
 
-        if not has_workout:
-            self._pause_button.setEnabled(False)
-            self._pause_button.setText("Pause")
-        elif status is WorkoutStatus.RUNNING:
+        if status is WorkoutStatus.RUNNING:
             self._pause_button.setEnabled(True)
             self._pause_button.setText("Pause")
         elif status is WorkoutStatus.PAUSED:
@@ -343,8 +315,8 @@ class MainWindow(QMainWindow):
             self._pause_button.setEnabled(False)
             self._pause_button.setText("Pause")
 
-        self._reset_button.setEnabled(has_workout)
-        self._resync_button.setEnabled(has_workout)
+        self._reset_button.setEnabled(status in (WorkoutStatus.RUNNING, WorkoutStatus.PAUSED, WorkoutStatus.FINISHED))
+        self._resync_button.setEnabled(status in (WorkoutStatus.RUNNING, WorkoutStatus.PAUSED))
         audio_output = self._controller.get_audio_output()
         if self._controller.is_music_available() and audio_output is not None:
             audio_output.setVolume(1.0)

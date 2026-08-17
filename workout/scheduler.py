@@ -206,32 +206,10 @@ class WorkoutScheduler:
         return None, None, elapsed
 
     
-    def _optional_float(value: Optional[float]) -> Optional[float]:
+    def _optional_float(self, value: Optional[float]) -> Optional[float]:
         if value is None:
             return None
         return float(value)
-
-
-    # Attempt to notify music provider to start precomputing whenever a workout is chosen.
-    # This integration is intentionally small and defensive: it only calls provider if the scheduler
-    # has a reference to one (common in applications where components are wired together).
-    
-
-    def _notify_provider_workout_chosen(self, workout):
-        """
-        Should be invoked right after the scheduler selects/accepts a workout.
-        """
-        try:
-            if self.provider is None:
-                return
-            # If the provider supports precompute_recommendations, call it.
-            precompute = getattr(self.provider, "precompute_recommendations", None)
-            if callable(precompute):
-                # Attempt to pass provider's known repository if available to avoid extra DB work.
-                repo = getattr(self.provider, "song_repository", None)
-                precompute(workout, repository=repo)
-        except Exception:
-            logger.exception("Failed to notify music provider about selected workout")
 
     def _load_workout_file(self, path: Path) -> Workout:
         suffix = path.suffix.lower()

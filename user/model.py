@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 
 from helper_methods.model_methods import _optional_str, _optional_int_or_none, _optional_int, _optional_float_list, _str_to_list, current_timestampz
@@ -32,9 +32,9 @@ class UserSongStats:
     is_liked: bool = False
     play_count: int = 0
     skip_count: int = 0
-    first_played_at: datetime = current_timestampz()
-    last_played_at: datetime = current_timestampz()
-    last_skipped_at: datetime = None
+    first_played_at: Optional[datetime] = None
+    last_played_at: Optional[datetime] = None
+    last_skipped_at: Optional[datetime] = None
     total_play_time: int = 0
 
     @classmethod
@@ -59,8 +59,8 @@ class UserSongStats:
             "is_liked": self.is_liked,
             "play_count": self.play_count,
             "skip_count": self.skip_count,
-            "first_played_at": self.first_played_at.isoformat() if self.first_played_at else None,
-            "last_played_at": self.last_played_at.isoformat() if self.last_played_at else None,
+            "first_played_at": (self.first_played_at if self.first_played_at else current_timestampz()).isoformat(),
+            "last_played_at": current_timestampz().isoformat(),
             "last_skipped_at": self.last_skipped_at.isoformat() if self.last_skipped_at else None,
             "total_play_time": self.total_play_time,
         }
